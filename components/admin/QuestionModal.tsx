@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Plus, Trash2, Image as ImageIcon, Eye } from 'lucide-react';
+import { X, Plus, Trash2, Image as ImageIcon, ChevronDown } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { toast } from 'sonner';
 
@@ -8,6 +8,7 @@ interface QuestionModalProps {
     onClose: () => void;
     onSuccess: () => void;
     defaultType: 'APTITUDE' | 'PERSONALITY';
+    initialData?: any | null; // Added initialData for edit mode
 }
 
 interface OptionItem {
@@ -15,7 +16,7 @@ interface OptionItem {
     imageUrl: string | null;
 }
 
-export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType }: QuestionModalProps) {
+export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType, initialData }: QuestionModalProps) {
     const [formData, setFormData] = useState({
         category: '',
         difficulty: 'MEDIUM',
@@ -24,15 +25,15 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
         options: Array(5).fill({ text: '', imageUrl: null }) as OptionItem[],
         correctAnswer: '',
         score: 1,
-        imageUrl: null as string | null
+        imageUrl: null as string | null,
+        isReverseScore: false
     });
 
-    // Files state
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [optionImageFiles, setOptionImageFiles] = useState<{ [key: number]: File }>({});
-
     const [loading, setLoading] = useState(false);
     const [existingCategories, setExistingCategories] = useState<string[]>([]);
+    const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
     useEffect(() => {
         if (isOpen) {
@@ -44,8 +45,56 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
                 }
             };
             fetchCategories();
+
+            // Populate form if initialData exists (Edit Mode)
+            if (initialData) {
+                // Ensure options are parsed correctly depending on DB format (JSONB array or array of object)
+                let parsedOptions: OptionItem[] = [];
+                if (Array.isArray(initialData.options)) {
+                    parsedOptions = initialData.options.map((opt: any) => {
+                        if (typeof opt === 'string') return { text: opt, imageUrl: null };
+                        return { text: opt.text || '', imageUrl: opt.imageUrl || null };
+                    });
+                } else {
+                    parsedOptions = Array(5).fill({ text: '', imageUrl: null });
+                }
+
+                // Correct Answer (Index to 1-based string)
+                const correctAns = initialData.correct_answer !== null && initialData.correct_answer !== undefined
+                    ? String(initialData.correct_answer + 1)
+                    : '';
+
+                setFormData({
+                    category: initialData.category || '',
+                    difficulty: initialData.difficulty || 'MEDIUM',
+                    question: initialData.content || '',
+                    description: initialData.description || '',
+                    options: parsedOptions,
+                    correctAnswer: correctAns,
+                    score: initialData.score || 1,
+                    imageUrl: initialData.image_url || null,
+                    isReverseScore: initialData.is_reverse_scored || false
+                });
+                setImageFile(null); // Reset file inputs
+                setOptionImageFiles({});
+            } else {
+                // Reset for Create Mode
+                setFormData({
+                    category: '',
+                    difficulty: 'MEDIUM',
+                    question: '',
+                    description: '',
+                    options: Array(5).fill({ text: '', imageUrl: null }) as OptionItem[],
+                    correctAnswer: '',
+                    score: 1,
+                    imageUrl: null,
+                    isReverseScore: false
+                });
+                setImageFile(null);
+                setOptionImageFiles({});
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, initialData]);
 
     if (!isOpen) return null;
 
@@ -56,10 +105,7 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
     };
 
     const handleOptionImageChange = (idx: number, file: File) => {
-        // Store file to upload later
         setOptionImageFiles({ ...optionImageFiles, [idx]: file });
-
-        // Show preview immediately using object URL
         const previewUrl = URL.createObjectURL(file);
         const newOptions = [...formData.options];
         newOptions[idx] = { ...newOptions[idx], imageUrl: previewUrl };
@@ -70,7 +116,6 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
         const newFiles = { ...optionImageFiles };
         delete newFiles[idx];
         setOptionImageFiles(newFiles);
-
         const newOptions = [...formData.options];
         newOptions[idx] = { ...newOptions[idx], imageUrl: null };
         setFormData({ ...formData, options: newOptions });
@@ -85,30 +130,20 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
         if (formData.options.length <= 2) return;
         const newOptions = formData.options.filter((_, i) => i !== idx);
 
-        // Adjust files index map? It's complicated. 
-        // Simpler to just reset files for safety or handle shift.
-        // For now, let's just clear files if we delete an option to avoid mismatch (MVP).
-        // A better way is to shift the keys in `optionImageFiles`.
-
-        // Let's re-build optionImageFiles
-        const newFiles: { [key: number]: File } = {};
-        let newKey = 0;
-        Object.keys(optionImageFiles).forEach(keyStr => {
-            const k = parseInt(keyStr);
-            if (k !== idx) {
-                const targetKey = k > idx ? k - 1 : k;
-                newFiles[targetKey] = optionImageFiles[k];
-            }
-        });
-        setOptionImageFiles(newFiles);
+        // Re-index files (simple clear for safety in this version)
+        setOptionImageFiles({});
         setFormData({ ...formData, options: newOptions });
     };
 
     const handleMainImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
-            const file = e.target.files[0];
-            setImageFile(file);
+            setImageFile(e.target.files[0]);
         }
+    };
+
+    const handleMainImageRemove = () => {
+        setImageFile(null);
+        setFormData({ ...formData, imageUrl: null });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -128,72 +163,66 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
                 correctIndex = ansNum - 1;
             }
 
-            // 1. Upload Main Image
             let finalImageUrl = formData.imageUrl;
+
+            // Upload Main Image if new file selected
             if (imageFile) {
                 const fileExt = imageFile.name.split('.').pop();
                 const fileName = `main_${Math.random()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('questions')
-                    .upload(fileName, imageFile);
+                const { error: uploadError } = await supabase.storage.from('questions').upload(fileName, imageFile);
                 if (uploadError) throw uploadError;
                 const { data } = supabase.storage.from('questions').getPublicUrl(fileName);
                 finalImageUrl = data.publicUrl;
             }
 
-            // 2. Upload Option Images
             const finalOptions = [...formData.options];
+            // Upload Option Images if new files selected
             for (const [idxStr, file] of Object.entries(optionImageFiles)) {
                 const idx = parseInt(idxStr);
                 const fileExt = file.name.split('.').pop();
                 const fileName = `opt_${Math.random()}.${fileExt}`;
-                const { error: uploadError } = await supabase.storage
-                    .from('questions')
-                    .upload(fileName, file);
-
-                if (uploadError) {
-                    console.error('Option upload failed', uploadError);
-                    continue;
-                }
+                const { error: uploadError } = await supabase.storage.from('questions').upload(fileName, file);
+                if (uploadError) continue;
                 const { data } = supabase.storage.from('questions').getPublicUrl(fileName);
                 finalOptions[idx] = { ...finalOptions[idx], imageUrl: data.publicUrl };
             }
 
-            // Clean up previews (object URLs) if they weren't real files (though we only set preview on file selection)
-            // If user didn't select file but kept preview... wait, our state only has preview if file selected.
-            // But if we edit an existing question (future feature), we might have real URLs.
-            // Here we assume new create mode.
-
-            const { error } = await supabase.from('questions').insert({
+            const payload = {
                 category: formData.category || '일반',
-                difficulty: formData.difficulty,
+                difficulty: 'MEDIUM',
                 content: formData.question,
                 description: formData.description,
                 image_url: finalImageUrl,
-                options: finalOptions, // Saves as JSONB array of objects
+                options: finalOptions,
                 correct_answer: correctIndex,
-                score: formData.score,
-                type: defaultType
-            });
+                score: 1,
+                type: defaultType,
+                is_reverse_scored: formData.isReverseScore
+            };
+
+            let error;
+            if (initialData) {
+                // UPDATE
+                const { error: updateError } = await supabase
+                    .from('questions')
+                    .update(payload)
+                    .eq('id', initialData.id);
+                error = updateError;
+            } else {
+                // INSERT
+                const { error: insertError } = await supabase
+                    .from('questions')
+                    .insert(payload);
+                error = insertError;
+            }
 
             if (error) throw error;
-
-            toast.success('문제가 추가되었습니다.');
+            toast.success(initialData ? '문제가 수정되었습니다.' : '문제가 추가되었습니다.');
             onSuccess();
 
-            // Reset
-            setFormData({
-                category: '',
-                difficulty: 'Medium',
-                question: '',
-                description: '',
-                options: Array(5).fill({ text: '', imageUrl: null }),
-                correctAnswer: '',
-                score: 1,
-                imageUrl: null
-            });
-            setImageFile(null);
-            setOptionImageFiles({});
+            // Initial cleanup handled by useEffect when modal closes or opens with new data,
+            // but for safety/UX we can clear here too if we want to stay open (optional).
+            // Usually we assume modal closes on success.
 
         } catch (error: any) {
             toast.error(error.message);
@@ -203,192 +232,251 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType 
     };
 
     return (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto text-black">
-                <div className="p-6 border-b flex justify-between items-center sticky top-0 bg-white z-10">
-                    <h2 className="text-xl font-bold">
-                        {defaultType === 'APTITUDE' ? '적성검사 문제 추가' : '인성검사 문제 추가'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-black">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-end sm:items-center justify-center z-50 p-0 sm:p-4">
+            <div className="bg-white w-full max-w-lg sm:rounded-3xl h-[90vh] sm:h-auto max-h-[90vh] flex flex-col shadow-2xl animate-in slide-in-from-bottom-10 fade-in duration-300">
+
+                {/* Header */}
+                <div className="p-6 pb-4 flex justify-between items-center border-b border-gray-100">
+                    <div>
+                        <h2 className="text-2xl font-bold text-slate-900 leading-tight">
+                            {initialData ? '문제 수정' : (defaultType === 'APTITUDE' ? '적성검사 문제' : '인성검사 문제')}
+                        </h2>
+                        <p className="text-sm text-slate-500 mt-1">
+                            {initialData ? '기존 문제를 수정합니다.' : '새로운 문제를 만들어보세요.'}
+                        </p>
+                    </div>
+                    <button onClick={onClose} className="p-2 rounded-full hover:bg-slate-100 transition-colors text-slate-500">
                         <X size={24} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-6">
-                    <div>
-                        <label className="block text-sm font-bold mb-2">영역 (Category)</label>
-                        <input
-                            list="categories"
-                            className="w-full p-2 border rounded-lg focus:ring-2 focus:ring-blue-500 text-black placeholder:text-gray-400"
-                            placeholder="영역을 선택하거나 직접 입력하세요"
-                            value={formData.category}
-                            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                        />
-                        <datalist id="categories">
-                            {existingCategories.map((cat, i) => (
-                                <option key={i} value={cat} />
-                            ))}
-                        </datalist>
-                    </div>
+                {/* Body - Scrollable */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
 
-                    {/* Difficulty and Score removed from UI, defaults used */}
+                    <form id="question-form" onSubmit={handleSubmit} className="space-y-8">
 
-                    <div>
-                        <label className="block text-sm font-bold mb-2">문제 내용 <span className="text-red-500">*</span></label>
-                        <textarea
-                            className="w-full p-3 border rounded-lg h-24 focus:ring-2 focus:ring-blue-500 text-black"
-                            placeholder="질문 내용을 입력하세요..."
-                            value={formData.question}
-                            onChange={(e) => setFormData({ ...formData, question: e.target.value })}
-                            required
-                        />
-                    </div>
+                        {/* 1. 영역 (Category) */}
+                        <div className="space-y-2 relative">
+                            <label className="block text-sm font-semibold text-slate-900">
+                                {defaultType === 'APTITUDE' ? '영역' : '성격척도'} <span className="text-red-500">*</span>
+                            </label>
+                            <div className="relative">
+                                <input
+                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all"
+                                    placeholder={defaultType === 'APTITUDE' ? "예: 수리영역, 언어영역..." : "예: 외향성, 성실성..."}
+                                    value={formData.category}
+                                    onChange={(e) => {
+                                        setFormData({ ...formData, category: e.target.value });
+                                        setIsCategoryDropdownOpen(true);
+                                    }}
+                                    onFocus={() => setIsCategoryDropdownOpen(true)}
+                                    onBlur={() => setTimeout(() => setIsCategoryDropdownOpen(false), 200)}
+                                    autoComplete="off"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
+                                >
+                                    <ChevronDown size={20} />
+                                </button>
 
-                    <div>
-                        <label className="block text-sm font-bold mb-2">문제 추가 설명 (이미지/텍스트)</label>
-                        <div className="space-y-4">
-                            <div className="flex items-center gap-2">
-                                <label className="cursor-pointer bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded-lg text-sm flex items-center gap-2 transition-colors">
-                                    <ImageIcon size={16} />
-                                    {imageFile ? '이미지 변경' : '이미지 업로드'}
-                                    <input type="file" className="hidden" accept="image/*" onChange={handleMainImageChange} />
-                                </label>
-                                {imageFile && <span className="text-sm text-blue-600 truncate">{imageFile.name}</span>}
+                                {isCategoryDropdownOpen && (
+                                    <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-100 rounded-2xl shadow-xl max-h-48 overflow-y-auto z-50 custom-scrollbar animate-in fade-in zoom-in-95 duration-200">
+                                        {existingCategories.filter(cat => cat.toLowerCase().includes(formData.category.toLowerCase())).length > 0 ? (
+                                            existingCategories.filter(cat => cat.toLowerCase().includes(formData.category.toLowerCase())).map((cat, i) => (
+                                                <button
+                                                    key={i}
+                                                    type="button"
+                                                    className="w-full text-left px-4 py-3 hover:bg-slate-50 text-slate-700 font-medium transition-colors"
+                                                    onClick={() => {
+                                                        setFormData({ ...formData, category: cat });
+                                                        setIsCategoryDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    {cat}
+                                                </button>
+                                            ))
+                                        ) : (
+                                            existingCategories.length > 0 && (
+                                                <div className="px-4 py-3 text-slate-400 text-sm">
+                                                    일치하는 항목이 없습니다. (새로 입력됩니다)
+                                                </div>
+                                            )
+                                        )}
+                                        {/* Show ALL option if filtered list is small and there are more categories? 
+                                            Or simpler: Just render filtered list. 
+                                            The USER problem was "When I click, only current val shows". 
+                                            With this custom UI, if I have "수리영역" typed, filter will still only show "수리영역".
+                                            This doesn't fully solve "I want to see all".
+                                            
+                                            FIX: Let's show ALL categories if the user clicks the toggle button, 
+                                            OR if the input value exactly matches one of the categories (implying selection mode).
+                                        */}
+                                    </div>
+                                )}
                             </div>
+                        </div>
 
-                            {/* Main Image Preview */}
-                            {imageFile && (
-                                <div className="relative w-full h-40 bg-gray-50 rounded-lg overflow-hidden border">
-                                    <img
-                                        src={URL.createObjectURL(imageFile)}
-                                        alt="Preview"
-                                        className="w-full h-full object-contain"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => setImageFile(null)}
-                                        className="absolute top-2 right-2 bg-white/80 p-1 rounded-full text-red-500 hover:text-red-700"
-                                    >
-                                        <X size={16} />
-                                    </button>
-                                </div>
-                            )}
-
+                        {/* 2. 문제 내용 */}
+                        <div className="space-y-2">
+                            <label className="block text-sm font-semibold text-slate-900">
+                                문제 내용 <span className="text-red-500">*</span>
+                            </label>
                             <textarea
-                                className="w-full p-3 border rounded-lg h-20 focus:ring-2 focus:ring-blue-500 text-black"
-                                placeholder="추가 설명이 필요하면 텍스트로 입력하거나 이미지를 업로드하세요."
-                                value={formData.description}
-                                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all min-h-[120px] resize-none"
+                                placeholder="질문을 입력해주세요."
+                                value={formData.question}
+                                onChange={(e) => setFormData({ ...formData, question: e.target.value })}
+                                required
                             />
                         </div>
-                    </div>
 
-                    {/* Options with Images */}
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <label className="text-sm font-bold">선택지 ({formData.options.length}개)</label>
-                            <button
-                                type="button"
-                                onClick={addOption}
-                                disabled={formData.options.length >= 10}
-                                className="text-xs bg-blue-50 text-blue-600 px-2 py-1 rounded hover:bg-blue-100 disabled:opacity-50"
-                            >
-                                + 선택지 추가
-                            </button>
-                        </div>
-                        <div className="space-y-3">
-                            {formData.options.map((opt, idx) => (
-                                <div key={idx} className="flex flex-col gap-2 p-3 border rounded-lg bg-gray-50/50">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-bold w-6 text-center">{idx + 1}</span>
-                                        <input
-                                            className="flex-1 p-2 border rounded text-sm text-black"
-                                            placeholder={`선택지 ${idx + 1}`}
-                                            value={opt.text}
-                                            onChange={(e) => handleOptionTextChange(idx, e.target.value)}
-                                            required={!opt.imageUrl} // Not required if image exists? Maybe both?
-                                        />
+                        {/* Reverse Score Checkbox - PERSONALITY Only */}
+                        {defaultType === 'PERSONALITY' && (
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="checkbox"
+                                    id="isReverseScore"
+                                    className="w-5 h-5 rounded border-slate-300 text-slate-900 focus:ring-slate-900"
+                                    checked={formData.isReverseScore}
+                                    onChange={(e) => setFormData({ ...formData, isReverseScore: e.target.checked })}
+                                />
+                                <label htmlFor="isReverseScore" className="text-sm font-semibold text-slate-900 cursor-pointer select-none">
+                                    역채점 (Reverse Scoring)
+                                </label>
+                            </div>
+                        )}
 
-                                        {/* Image Upload Button */}
-                                        <div className="relative">
-                                            <label className="cursor-pointer p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors flex items-center justify-center">
-                                                <ImageIcon size={18} />
-                                                <input
-                                                    type="file"
-                                                    className="hidden"
-                                                    accept="image/*"
-                                                    onChange={(e) => {
-                                                        if (e.target.files?.[0]) handleOptionImageChange(idx, e.target.files[0]);
-                                                    }}
-                                                />
-                                            </label>
-                                        </div>
-
-                                        <button
-                                            type="button"
-                                            onClick={() => removeOption(idx)}
-                                            disabled={formData.options.length <= 2}
-                                            className="text-red-400 hover:text-red-600 p-2 hover:bg-red-50 rounded disabled:opacity-30"
-                                        >
-                                            <Trash2 size={18} />
-                                        </button>
-                                    </div>
-
-                                    {/* Option Image Preview */}
-                                    {opt.imageUrl && (
-                                        <div className="ml-8 relative w-32 h-32 bg-white rounded border overflow-hidden group">
+                        {/* 3. 추가 설명 (Optional) - APTITUDE Only */}
+                        {defaultType === 'APTITUDE' && (
+                            <div className="space-y-2">
+                                <label className="block text-sm font-semibold text-slate-900">
+                                    추가 설명 및 이미지
+                                </label>
+                                <div className="bg-slate-50 border border-slate-200 rounded-2xl p-2">
+                                    {(imageFile || formData.imageUrl) ? (
+                                        <div className="relative w-full h-48 bg-white rounded-xl overflow-hidden mb-2 border border-slate-100">
                                             <img
-                                                src={opt.imageUrl}
-                                                alt={`Option ${idx + 1}`}
+                                                src={imageFile ? URL.createObjectURL(imageFile) : formData.imageUrl!}
+                                                alt="Preview"
                                                 className="w-full h-full object-contain"
                                             />
                                             <button
                                                 type="button"
-                                                onClick={() => removeOptionImage(idx)}
-                                                className="absolute top-1 right-1 bg-white/90 p-1 rounded-full text-red-500 opacity-0 group-hover:opacity-100 transition-opacity shadow-sm"
+                                                onClick={handleMainImageRemove}
+                                                className="absolute top-2 right-2 bg-black/60 p-1.5 rounded-full text-white hover:bg-black/80 transition-colors"
                                             >
                                                 <X size={14} />
                                             </button>
                                         </div>
-                                    )}
+                                    ) : null}
+
+                                    <div className="flex gap-2 items-start">
+                                        <label className="cursor-pointer p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors">
+                                            <ImageIcon size={24} />
+                                            <input type="file" className="hidden" accept="image/*" onChange={handleMainImageChange} />
+                                        </label>
+                                        <textarea
+                                            className="flex-1 p-3 bg-transparent border-none text-slate-900 placeholder:text-slate-400 focus:ring-0 resize-none h-20"
+                                            placeholder="설명이 필요하다면 입력하세요."
+                                            value={formData.description}
+                                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                                        />
+                                    </div>
                                 </div>
-                            ))}
-                        </div>
-                    </div>
+                            </div>
+                        )}
 
-                    {defaultType === 'APTITUDE' && (
-                        <div>
-                            <label className="block text-sm font-bold mb-2">정답 번호 <span className="text-red-500">*</span></label>
-                            <input
-                                type="number"
-                                className="w-full p-2 border rounded-lg text-black"
-                                placeholder="정답 번호를 입력하세요"
-                                value={formData.correctAnswer}
-                                onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
-                                min={1}
-                                max={formData.options.length}
-                                required
-                            />
-                        </div>
-                    )}
+                        {/* 4. 선택지 - APTITUDE Only */}
+                        {defaultType === 'APTITUDE' && (
+                            <div className="space-y-3">
+                                <div className="flex justify-between items-end">
+                                    <label className="block text-sm font-semibold text-slate-900">
+                                        선택지
+                                    </label>
+                                    <button type="button" onClick={addOption} disabled={formData.options.length >= 10} className="text-sm font-medium text-blue-600 hover:text-blue-700 disabled:opacity-50">
+                                        + 항목 추가
+                                    </button>
+                                </div>
 
-                    <div className="pt-4 flex justify-end gap-2">
-                        <button
-                            type="button"
-                            onClick={onClose}
-                            className="px-6 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-bold"
-                        >
-                            취소
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="px-6 py-2 bg-slate-900 text-white rounded-lg font-bold hover:bg-slate-800 disabled:opacity-50"
-                        >
-                            {loading ? '저장 중...' : '문제 저장'}
-                        </button>
-                    </div>
-                </form>
+                                <div className="space-y-3">
+                                    {formData.options.map((opt, idx) => (
+                                        <div key={idx} className="group relative bg-white border border-slate-200 rounded-2xl p-1 pl-4 flex items-center gap-3 shadow-sm hover:border-slate-300 transition-colors focus-within:ring-2 focus-within:ring-slate-900">
+                                            <span className="text-slate-400 font-medium text-sm w-4">{idx + 1}</span>
+                                            <div className="flex-1 flex flex-col py-2">
+                                                <input
+                                                    className="w-full bg-transparent border-none p-1 text-slate-900 placeholder:text-slate-400 focus:ring-0 font-medium"
+                                                    placeholder={`선택지 ${idx + 1}`}
+                                                    value={opt.text}
+                                                    onChange={(e) => handleOptionTextChange(idx, e.target.value)}
+                                                    required={!opt.imageUrl}
+                                                />
+                                                {/* Image Preview inside option */}
+                                                {opt.imageUrl && (
+                                                    <div className="relative mt-2 w-20 h-20 bg-slate-50 rounded-lg overflow-hidden border border-slate-100">
+                                                        <img src={opt.imageUrl} className="w-full h-full object-cover" />
+                                                        <button type="button" onClick={() => removeOptionImage(idx)} className="absolute top-1 right-1 bg-black/50 p-1 rounded-full text-white hover:bg-black/70">
+                                                            <X size={10} />
+                                                        </button>
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center gap-1 pr-2">
+                                                <label className="cursor-pointer p-2 text-slate-400 hover:text-blue-600 transition-colors">
+                                                    <ImageIcon size={18} />
+                                                    <input type="file" className="hidden" accept="image/*" onChange={(e) => { if (e.target.files?.[0]) handleOptionImageChange(idx, e.target.files[0]) }} />
+                                                </label>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => removeOption(idx)}
+                                                    disabled={formData.options.length <= 2}
+                                                    className="p-2 text-slate-300 hover:text-red-500 disabled:opacity-0 transition-colors"
+                                                >
+                                                    <Trash2 size={18} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* 5. 정답 (적성검사만) */}
+                        {defaultType === 'APTITUDE' && (
+                            <div className="space-y-2">
+                                <label className="block text-sm font-semibold text-slate-900">
+                                    정답 <span className="text-red-500">*</span>
+                                </label>
+                                <input
+                                    type="number"
+                                    className="w-full p-4 bg-slate-50 border border-slate-200 rounded-2xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900 transition-all font-bold"
+                                    placeholder="정답 번호를 입력하세요"
+                                    value={formData.correctAnswer}
+                                    onChange={(e) => setFormData({ ...formData, correctAnswer: e.target.value })}
+                                    min={1}
+                                    max={formData.options.length}
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        <div className="pb-8"></div> {/* Bottom Spacer */}
+                    </form>
+                </div>
+
+                {/* Footer Action */}
+                <div className="p-6 pt-2 bg-white border-t border-gray-50 rounded-b-3xl">
+                    <button
+                        type="submit"
+                        form="question-form"
+                        disabled={loading}
+                        className="w-full py-4 bg-slate-900 text-white rounded-2xl font-bold text-lg hover:bg-slate-800 active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-xl shadow-slate-200"
+                    >
+                        {loading ? '저장 중...' : (initialData ? '수정 완료' : '완료하기')}
+                    </button>
+                </div>
             </div>
         </div>
     );

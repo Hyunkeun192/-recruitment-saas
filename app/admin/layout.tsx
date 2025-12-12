@@ -67,18 +67,39 @@ export default function AdminLayout({
                         채용 공고
                     </NavLink>
 
-                    {/* 문제 관리 Submenu */}
+                    {/* 문제 관리 (Questions) */}
                     <div className="pt-2 pb-1">
                         <div className="flex items-center gap-3 px-4 py-2 text-sm font-semibold text-slate-500">
                             <FileText size={18} />
-                            문제 관리
+                            문항 관리
                         </div>
                         <div className="pl-4 space-y-1">
                             <NavLink href="/admin/questions?tab=APTITUDE" icon={<div className="w-1.5 h-1.5 rounded-full bg-slate-400" />} isSubItem>
-                                적성검사
+                                적성검사 문항
                             </NavLink>
                             <NavLink href="/admin/questions?tab=PERSONALITY" icon={<div className="w-1.5 h-1.5 rounded-full bg-slate-400" />} isSubItem>
-                                인성검사
+                                인성검사 문항
+                            </NavLink>
+                        </div>
+                    </div>
+
+                    {/* 검사 관리 (Tests) */}
+                    <div className="pt-2 pb-1">
+                        <div className="flex items-center gap-3 px-4 py-2 text-sm font-semibold text-slate-500">
+                            <FileText size={18} />
+                            검사 관리
+                        </div>
+                        <div className="pl-4 space-y-1">
+                            {/* 적성검사 Sub-menu Label */}
+                            <div className="px-4 py-2 text-xs font-semibold text-slate-400">적성검사</div>
+                            <NavLink href="/admin/tests/aptitude" icon={<div className="w-1.5 h-1.5 rounded-full bg-blue-400" />} isSubItem>
+                                검사 만들기
+                            </NavLink>
+                            <NavLink href="/admin/tests/aptitude/answers" icon={<div className="w-1.5 h-1.5 rounded-full bg-blue-400" />} isSubItem>
+                                정답 관리
+                            </NavLink>
+                            <NavLink href="/admin/tests/aptitude/scoring" icon={<div className="w-1.5 h-1.5 rounded-full bg-blue-400" />} isSubItem>
+                                채점 관리
                             </NavLink>
                         </div>
                     </div>

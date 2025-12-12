@@ -7,7 +7,8 @@ import Link from 'next/link';
 
 interface DashboardStats {
     totalCandidates: number;
-    totalQuestions: number;
+    aptitudeCount: number;
+    personalityCount: number;
     activePostings: number;
     recentApps: any[];
 }
@@ -21,7 +22,8 @@ interface DashboardStats {
 export default function AdminDashboard() {
     const [stats, setStats] = useState<DashboardStats>({
         totalCandidates: 0,
-        totalQuestions: 0,
+        aptitudeCount: 0,
+        personalityCount: 0,
         activePostings: 0,
         recentApps: []
     });
@@ -36,12 +38,14 @@ export default function AdminDashboard() {
                 // 병렬로 API 호출하여 속도 개선
                 const [
                     { count: candidatesCount },
-                    { count: questionsCount },
+                    { count: aptitudeCount },
+                    { count: personalityCount },
                     { count: postingsCount },
                     { data: recentApps, error: appsError }
                 ] = await Promise.all([
                     supabase.from('applications').select('*', { count: 'exact', head: true }),
-                    supabase.from('questions').select('*', { count: 'exact', head: true }),
+                    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('type', 'APTITUDE'),
+                    supabase.from('questions').select('*', { count: 'exact', head: true }).eq('type', 'PERSONALITY'),
                     supabase.from('postings').select('*', { count: 'exact', head: true }),
                     fetchRecentApps(1)
                 ]);
@@ -50,15 +54,14 @@ export default function AdminDashboard() {
 
                 setStats({
                     totalCandidates: candidatesCount || 0,
-                    totalQuestions: questionsCount || 0,
+                    aptitudeCount: aptitudeCount || 0,
+                    personalityCount: personalityCount || 0,
                     activePostings: postingsCount || 0,
                     recentApps: recentApps || []
                 });
 
                 // Check if there might be more (if we got full page)
                 if (recentApps && recentApps.length === ITEMS_PER_PAGE) {
-                    // Optimistically assume more, or we could do a count query. 
-                    // For simple Next/Prev, we can check if length < limit to disable Next.
                     setHasMoreApps(true);
                 } else {
                     setHasMoreApps(false);
@@ -119,12 +122,12 @@ export default function AdminDashboard() {
             </div>
 
             {/* 통계 그리드 */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <StatsCard
                     title="총 지원자 수"
                     value={stats.totalCandidates}
                     icon={<Users size={24} className="text-blue-600" />}
-                    trend="지난달 대비 +12%"
+                    trend="전체 지원자"
                     color="bg-blue-50"
                 />
                 <StatsCard
@@ -135,11 +138,18 @@ export default function AdminDashboard() {
                     color="bg-purple-50"
                 />
                 <StatsCard
-                    title="등록된 문제"
-                    value={stats.totalQuestions}
+                    title="적성검사 문항"
+                    value={stats.aptitudeCount}
                     icon={<FileText size={24} className="text-green-600" />}
-                    trend="테스트 출제 가능"
+                    trend="등록된 문제 수"
                     color="bg-green-50"
+                />
+                <StatsCard
+                    title="인성검사 문항"
+                    value={stats.personalityCount}
+                    icon={<FileText size={24} className="text-indigo-600" />}
+                    trend="등록된 문제 수"
+                    color="bg-indigo-50"
                 />
             </div>
 
