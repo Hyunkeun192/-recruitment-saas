@@ -1,0 +1,105 @@
+import { createServerClient, type CookieOptions } from '@supabase/ssr';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
+
+export async function middleware(req: NextRequest) {
+  let response = NextResponse.next({
+    request: {
+      headers: req.headers,
+    },
+  });
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        get(name: string) {
+          return req.cookies.get(name)?.value;
+        },
+        set(name: string, value: string, options: CookieOptions) {
+          req.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value,
+            ...options,
+          });
+        },
+        remove(name: string, options: CookieOptions) {
+          req.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+          response = NextResponse.next({
+            request: {
+              headers: req.headers,
+            },
+          });
+          response.cookies.set({
+            name,
+            value: '',
+            ...options,
+          });
+        },
+      },
+    }
+  );
+
+  // 1. Session Refresh & Auth Check
+  const { data: { session } } = await supabase.auth.getSession();
+
+  // 2. God Mode (Impersonation) Logic
+  const impersonateTargetId = req.headers.get('x-impersonate-id');
+
+  if (impersonateTargetId && session) {
+    // Verify current user is SUPER_ADMIN
+    const { data: userRole } = await supabase
+      .from('users')
+      .select('role')
+      .eq('id', session.user.id)
+      .single();
+
+    if (userRole?.role === 'SUPER_ADMIN') {
+      console.warn(`[AUDIT] Super Admin ${session.user.id} is impersonating ${impersonateTargetId}`);
+      response.headers.set('x-act-as-user-id', impersonateTargetId);
+    } else {
+      return new NextResponse('Unauthorized Impersonation', { status: 403 });
+    }
+  }
+
+  // 3. Kill Switch (Emergency Controls)
+  if (session) {
+    const { data: membership } = await supabase
+      .from('company_members')
+      .select('company_id, companies(status)')
+      .eq('user_id', session.user.id)
+      .single();
+
+    if (membership && membership.companies) {
+      // @ts-ignore
+      const companyStatus = membership.companies.status;
+      if (companyStatus === 'SUSPENDED') {
+        return new NextResponse(
+          JSON.stringify({ error: 'Service Suspended', message: 'Contact Support' }),
+          { status: 403, headers: { 'content-type': 'application/json' } }
+        );
+      }
+    }
+  }
+
+  return response;
+}
+
+export const config = {
+  matcher: ['/admin/:path*', '/evaluator/:path*', '/jobs/:id/apply'],
+};
