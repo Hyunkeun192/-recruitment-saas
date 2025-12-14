@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { v4 as uuidv4 } from 'uuid';
 import { addDays } from 'date-fns';
 
 export async function POST(request: Request) {
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         // Auth Check: Verify Admin
         // const { data: { user } } = await supabase.auth.getUser();

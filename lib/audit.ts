@@ -1,4 +1,4 @@
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 // PIPA Requirement: Log who accessed what, when, and from where.
 // Usage: await logAuditEvent(userId, 'VIEW_CANDIDATE', candidateId, ipAddress);
@@ -11,7 +11,7 @@ export async function logAuditEvent(
     ip_address: string = 'unknown' // In Next.js, get from headers
 ) {
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         // actor_id in schema is likely UUID 'auth.users'. If we have a non-UUID actor (like 'SYSTEM'), 
         // we should store it in details or make actor_id nullable.

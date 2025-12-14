@@ -51,6 +51,7 @@ export default function PostingDetailPage() {
             const config = data.site_config || { intro_type: 'TYPE_A', questions: [] };
             setIntroType(config.intro_type || 'TYPE_A');
             setQuestions(config.questions || []);
+            setSelectedTestId(config.test_id || '');
         }
         setLoading(false);
     }
@@ -65,7 +66,8 @@ export default function PostingDetailPage() {
 
         const siteConfig = {
             intro_type: introType,
-            questions: questions
+            questions: questions,
+            test_id: selectedTestId
         };
 
         const { error } = await supabase
@@ -138,6 +140,27 @@ export default function PostingDetailPage() {
         const newQ = [...questions];
         newQ[idx] = val;
         setQuestions(newQ);
+    }
+
+    // Exam Config
+    const [selectedTestId, setSelectedTestId] = useState<string>('');
+    const [activeTests, setActiveTests] = useState<{ id: string, title: string, type: string }[]>([]);
+
+    useEffect(() => {
+        fetchActiveTests();
+    }, []);
+
+    async function fetchActiveTests() {
+        // Fetch only ACTIVE tests
+        const { data } = await supabase
+            .from('tests')
+            .select('id, title, type')
+            .eq('status', 'ACTIVE')
+            .order('created_at', { ascending: false });
+
+        if (data) {
+            setActiveTests(data);
+        }
     }
 
     if (loading) {
@@ -281,6 +304,38 @@ export default function PostingDetailPage() {
                             </button>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            {/* Exam Configuration Section */}
+            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div className="p-6 border-b bg-slate-50">
+                    <h2 className="text-xl font-bold text-slate-900">필기전형 (검사) 설정</h2>
+                    <p className="text-sm text-slate-500">지원자가 응시할 적성/인성 검사를 선택합니다. (배포된 검사만 선택 가능)</p>
+                </div>
+                <div className="p-8">
+                    <label className="block text-sm font-bold text-slate-700 mb-2">연결할 검사 선택</label>
+                    <select
+                        value={selectedTestId}
+                        onChange={(e) => setSelectedTestId(e.target.value)}
+                        className="w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-black bg-white"
+                        style={{ color: 'black' }}
+                    >
+                        <option value="">검사를 선택하지 않음 (필기전형 생략)</option>
+                        {activeTests.map(test => (
+                            <option key={test.id} value={test.id}>
+                                [{test.type === 'APTITUDE' ? '적성' : '인성'}] {test.title}
+                            </option>
+                        ))}
+                    </select>
+                    {activeTests.length === 0 && (
+                        <p className="mt-2 text-sm text-red-500">
+                            * 선택 가능한 활성 상태(ACTIVE)의 검사가 없습니다. 대시보드에서 검사를 배포해주세요.
+                        </p>
+                    )}
+                    <p className="mt-2 text-sm text-slate-500">
+                        * 선택된 검사는 지원자가 서류 제출 후 또는 지정된 전형 단계에서 응시하게 됩니다.
+                    </p>
                 </div>
             </div>
 

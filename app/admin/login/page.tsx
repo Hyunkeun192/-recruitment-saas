@@ -31,8 +31,9 @@ export default function AdminLoginPage() {
             if (error) throw error;
 
             toast.success('로그인 성공! 대시보드로 이동합니다.');
-            router.push('/admin/dashboard');
-            router.refresh(); // 세션 상태 갱신을 위해 리프레시
+            // router.refresh()와 router.push()의 타이밍 문제로 미들웨어가 세션을 즉시 인식하지 못할 수 있습니다.
+            // 확실한 세션 갱신을 위해 hard navigation을 사용합니다.
+            window.location.href = '/admin/dashboard';
 
         } catch (error: any) {
             toast.error('로그인 실패: 이메일 또는 비밀번호를 확인해주세요.');

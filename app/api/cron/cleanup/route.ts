@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { logAuditEvent } from '@/lib/audit';
 
 // This endpoint should be triggered by a Cron Job (e.g., Vercel Cron or Supabase Edge Function)
@@ -8,7 +8,7 @@ import { logAuditEvent } from '@/lib/audit';
 
 export async function POST(request: Request) {
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         // Auth Check: Verify it's called by a trusted service (Header Secret)
         const authHeader = request.headers.get('x-cron-secret');

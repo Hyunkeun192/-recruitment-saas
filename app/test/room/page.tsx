@@ -81,39 +81,71 @@ export default function TestRoomPage() {
                 console.warn('No active test session found (this might be a demo)');
             }
 
-            // B. Fetch Questions
-            // In a real app, these should be linked to the test/application/posting
+            // B. Fetch Questions based on Assigned Test
             if (storeQuestions.length === 0) {
+                // 1. Get User's Application & Posting Config
+                const { data: appData, error: appError } = await supabase
+                    .from('applications')
+                    .select(`
+                        id, 
+                        posting_id,
+                        postings ( site_config )
+                    `)
+                    .eq('user_id', user.id)
+                    .single();
+
+                if (appData && appData.postings) {
+                    const siteConfig = (appData.postings as any).site_config || {};
+                    const assignedTestId = siteConfig.test_id;
+
+                    if (assignedTestId) {
+                        // 2. Fetch Test Info (Randomness)
+                        const { data: testInfo } = await supabase
+                            .from('tests')
+                            .select('is_random, time_limit')
+                            .eq('id', assignedTestId)
+                            .single();
+
+                        const isRandom = testInfo?.is_random || false;
+                        const timeLimit = testInfo?.time_limit || 60;
+
+                        // 3. Fetch Assigned Questions
+                        const { data: tqData } = await supabase
+                            .from('test_questions')
+                            .select(`
+                                order_index,
+                                questions (
+                                    id, content, image_url, options, score, category, difficulty
+                                )
+                            `)
+                            .eq('test_id', assignedTestId)
+                            .order('order_index', { ascending: true });
+
+                        if (tqData) {
+                            let finalQuestions = tqData.map((item: any) => item.questions).filter(Boolean);
+
+                            // Apply Randomization if enabled
+                            if (isRandom) {
+                                finalQuestions = finalQuestions.sort(() => Math.random() - 0.5);
+                            }
+
+                            initSession(finalQuestions, timeLimit);
+                        } else {
+                            toast.error('검사 문항을 불러올 수 없습니다.');
+                        }
+                        return; // Exit here if successful
+                    }
+                }
+
+                // Fallback (Existing) or Error
+                console.warn('No assigned test found, using fallback.');
                 const { data: questionsData } = await supabase
                     .from('questions')
                     .select('*')
                     .limit(5);
 
                 if (questionsData && questionsData.length > 0) {
-                    initSession(questionsData, testResult?.time_limit_minutes || 60);
-                } else {
-                    // Fallback Mock Data matching Question Schema
-                    const mockQuestions: any[] = [
-                        {
-                            id: '1',
-                            category: 'React',
-                            difficulty: 'MEDIUM',
-                            content: 'React의 Virtual DOM이 성능을 향상시키는 주된 원리는 무엇인가요?',
-                            options: ['브라우저 렌더링 엔진 교체', '메모리 상에서 DOM 변경사항 비교 후 배치 업데이트', '모든 DOM 요소를 캔버스로 렌더링', '자바스크립트 실행 속도 가속'],
-                            correct_answer: 1,
-                            created_at: '', updated_at: '', score: 1, image_url: null
-                        },
-                        {
-                            id: '2',
-                            category: 'Javascript',
-                            difficulty: 'EASY',
-                            content: 'Javascript에서 "Closure"란 무엇인가요?',
-                            options: null, // Text input
-                            correct_answer: 0,
-                            created_at: '', updated_at: '', score: 1, image_url: null
-                        }
-                    ];
-                    initSession(mockQuestions, 60);
+                    initSession(questionsData, 60);
                 }
             }
 

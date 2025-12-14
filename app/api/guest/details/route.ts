@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { maskData, decrypt } from '@/lib/encryption';
 
 export async function GET(request: Request) {
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 
         if (!token) return NextResponse.json({ error: 'Token required' }, { status: 400 });
 
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         // 1. Verify Token & Get Scope
         const { data: tokenData, error: tokenError } = await supabase

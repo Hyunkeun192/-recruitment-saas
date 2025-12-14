@@ -7,7 +7,7 @@
  * @module lib/supabase
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { createBrowserClient } from '@supabase/ssr';
 import type { Database } from '@/types/database';
 
 // Validate environment variables
@@ -22,27 +22,9 @@ if (process.env.NEXT_PUBLIC_SUPABASE_URL === undefined || process.env.NEXT_PUBLI
 
 /**
  * Supabase client for client-side operations
- * Use this in React components and client-side code
+ * Use this in React components and client-side code.
+ * It uses cookies (via @supabase/ssr) to share session with the server (Middleware/Server Components).
  */
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey, {
-    auth: {
-        persistSession: true,
-        autoRefreshToken: true,
-        detectSessionInUrl: true,
-    },
-});
+export const supabase = createBrowserClient<Database>(supabaseUrl, supabaseAnonKey);
 
-/**
- * Create a Supabase client for server-side operations
- * This should be used in API routes and server components
- * 
- * @returns Supabase client instance
- */
-export function createServerSupabaseClient() {
-    return createClient<Database>(supabaseUrl, supabaseAnonKey, {
-        auth: {
-            persistSession: false,
-            autoRefreshToken: false,
-        },
-    });
-}
+// Server-side client has been moved to lib/supabase-server.ts to avoid "next/headers" build errors in Client Components.

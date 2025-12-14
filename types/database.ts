@@ -251,8 +251,10 @@ export interface Database {
                     total_score: number;
                     max_score: number | null;
                     answers_log: Json | null;
+
                     violation_count: number;
                     violation_log: Json | null;
+                    test_id: string | null;
                     created_at: string;
                 };
                 Insert: {
@@ -266,6 +268,7 @@ export interface Database {
                     answers_log?: Json | null;
                     violation_count?: number;
                     violation_log?: Json | null;
+                    test_id?: string | null;
                     created_at?: string;
                 };
                 Update: {
@@ -279,6 +282,7 @@ export interface Database {
                     answers_log?: Json | null;
                     violation_count?: number;
                     violation_log?: Json | null;
+                    test_id?: string | null;
                     created_at?: string;
                 };
             };
@@ -426,6 +430,130 @@ export interface Database {
                     notes?: string | null;
                     created_at?: string;
                     updated_at?: string;
+                };
+            };
+            tests: {
+                Row: {
+                    id: string;
+                    title: string;
+                    description: string | null;
+                    type: 'APTITUDE' | 'PERSONALITY';
+                    time_limit: number | null;
+                    status: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+                    created_by: string | null;
+                    is_random: boolean | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    title: string;
+                    description?: string | null;
+                    type?: 'APTITUDE' | 'PERSONALITY';
+                    time_limit?: number | null;
+                    status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+                    created_by?: string | null;
+                    is_random?: boolean | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    title?: string;
+                    description?: string | null;
+                    type?: 'APTITUDE' | 'PERSONALITY';
+                    time_limit?: number | null;
+                    status?: 'DRAFT' | 'ACTIVE' | 'ARCHIVED';
+                    created_by?: string | null;
+                    is_random?: boolean | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
+            test_questions: {
+                Row: {
+                    test_id: string;
+                    question_id: string;
+                    order_index: number;
+                };
+                Insert: {
+                    test_id: string;
+                    question_id: string;
+                    order_index: number;
+                };
+                Update: {
+                    test_id?: string;
+                    question_id?: string;
+                    order_index?: number;
+                };
+            };
+            test_norms: {
+                Row: {
+                    id: string;
+                    test_id: string;
+                    category_name: string;
+                    mean_value: number;
+                    std_dev_value: number;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    test_id: string;
+                    category_name: string;
+                    mean_value: number;
+                    std_dev_value: number;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    test_id?: string;
+                    category_name?: string;
+                    mean_value?: number;
+                    std_dev_value?: number;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
+            competencies: {
+                Row: {
+                    id: string;
+                    test_id: string;
+                    name: string;
+                    description: string | null;
+                    created_at: string;
+                    updated_at: string;
+                };
+                Insert: {
+                    id?: string;
+                    test_id: string;
+                    name: string;
+                    description?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+                Update: {
+                    id?: string;
+                    test_id?: string;
+                    name?: string;
+                    description?: string | null;
+                    created_at?: string;
+                    updated_at?: string;
+                };
+            };
+            competency_scales: {
+                Row: {
+                    competency_id: string;
+                    scale_name: string;
+                };
+                Insert: {
+                    competency_id: string;
+                    scale_name: string;
+                };
+                Update: {
+                    competency_id?: string;
+                    scale_name?: string;
                 };
             };
         };

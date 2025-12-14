@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 
 // Define the type here or import if shared
 interface QuestionPayload {
@@ -16,7 +16,7 @@ interface QuestionPayload {
 
 export async function POST(request: Request) {
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
 
         // Auth Check (Optional for MVP setup, but recommended)
         // const { data: { session } } = await supabase.auth.getSession();

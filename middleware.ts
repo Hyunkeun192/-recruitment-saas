@@ -58,6 +58,16 @@ export async function middleware(req: NextRequest) {
   // 1. Session Refresh & Auth Check
   const { data: { session } } = await supabase.auth.getSession();
 
+  // 1.5 Admin Authentication Guard
+  if (req.nextUrl.pathname.startsWith('/admin') && !req.nextUrl.pathname.startsWith('/admin/login')) {
+    if (!session) {
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = '/admin/login';
+      redirectUrl.searchParams.set('redirectedFrom', req.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   // 2. God Mode (Impersonation) Logic
   const impersonateTargetId = req.headers.get('x-impersonate-id');
 

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import { createServerSupabaseClient } from '@/lib/supabase';
+import { createServerSupabaseClient } from '@/lib/supabase-server';
 import { sendEmail } from '@/lib/email';
 import { maskData } from '@/lib/encryption'; // Just to show we care about security even here (logging maybe)
 
 export async function POST(request: Request) {
     try {
-        const supabase = createServerSupabaseClient();
+        const supabase = await createServerSupabaseClient();
         const body = await request.json();
         const { application_id, status } = body; // 'PASS' | 'FAIL'
 
