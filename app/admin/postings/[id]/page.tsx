@@ -29,10 +29,12 @@ export default function PostingDetailPage() {
     }, []);
 
     async function fetchPosting() {
+        if (!params?.id) return;
+
         const { data, error } = await supabase
             .from('postings')
             .select('*')
-            .eq('id', params.id)
+            .eq('id', params.id as string)
             .single();
 
         if (error) {
@@ -79,7 +81,7 @@ export default function PostingDetailPage() {
                 image_url: imageUrl,
                 site_config: siteConfig // Save JSONB
             })
-            .eq('id', params.id);
+            .eq('id', params.id as string);
 
         if (error) {
             toast.error('저장 실패: ' + error.message);
@@ -95,7 +97,7 @@ export default function PostingDetailPage() {
         const { error } = await supabase
             .from('postings')
             .delete()
-            .eq('id', params.id);
+            .eq('id', params.id as string);
 
         if (error) {
             toast.error('삭제 실패: ' + error.message);
@@ -111,7 +113,7 @@ export default function PostingDetailPage() {
         setIsUploading(true);
         const file = e.target.files[0];
         const fileExt = file.name.split('.').pop();
-        const fileName = `${params.id}-${Date.now()}.${fileExt}`;
+        const fileName = `${params.id as string}-${Date.now()}.${fileExt}`;
         const filePath = `${fileName}`;
 
         const { error: uploadError } = await supabase.storage
