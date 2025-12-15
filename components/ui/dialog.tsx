@@ -53,8 +53,8 @@ const DialogTrigger = React.forwardRef<
         const child = React.Children.only(props.children) as React.ReactElement
         return React.cloneElement(child, {
             onClick: (e: any) => {
-                handleClick(e)
-                child.props.onClick?.(e)
+                handleClick(e);
+                (child as any).props.onClick?.(e)
             }
         } as any)
     }

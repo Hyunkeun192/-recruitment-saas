@@ -161,26 +161,26 @@ export default function CompetencyPage() {
             let compId = editingCompetencyId;
 
             if (editingCompetencyId === 'NEW') {
-                const { data, error } = await supabase
-                    .from('competencies')
+                const { data, error } = await (supabase
+                    .from('competencies') as any)
                     .insert({
                         test_id: selectedTestId,
                         name: formData.name,
                         description: formData.description
                     })
                     .select()
-                    .single() as any;
+                    .single();
 
                 if (error) throw error;
                 compId = data.id;
             } else {
-                const { error } = await supabase
-                    .from('competencies')
+                const { error } = await (supabase
+                    .from('competencies') as any)
                     .update({
                         name: formData.name,
                         description: formData.description
                     })
-                    .eq('id', editingCompetencyId) as any;
+                    .eq('id', editingCompetencyId); // Correct variable name
 
                 if (error) throw error;
             }
@@ -193,7 +193,8 @@ export default function CompetencyPage() {
                         competency_id: compId,
                         scale_name: s
                     }));
-                    await supabase.from('competency_scales').insert(mapped) as any;
+                    // Fix never type error on insert
+                    await (supabase.from('competency_scales') as any).insert(mapped);
                 }
             }
 

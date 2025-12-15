@@ -43,8 +43,8 @@ export async function POST(request: Request) {
             created_at: new Date().toISOString()
         }));
 
-        const { data, error } = await supabase
-            .from('questions')
+        const { data, error } = await (supabase
+            .from('questions') as any)
             .insert(insertData)
             .select();
 

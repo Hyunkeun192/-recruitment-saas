@@ -8,8 +8,8 @@ export async function POST(request: Request) {
         const supabase = await createServerSupabaseClient();
 
         // Auth Check: Verify Admin
-        // const { data: { user } } = await supabase.auth.getUser();
-        // if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
         const body = await request.json();
         const { posting_id, guest_email, guest_name, stage, is_masked = true, expires_in_days = 7 } = body;
@@ -23,14 +23,14 @@ export async function POST(request: Request) {
         const expiresAt = addDays(new Date(), expires_in_days).toISOString();
 
         // Insert into guest_access_tokens
-        const { data, error } = await supabase
-            .from('guest_access_tokens')
+        const { data, error } = await (supabase
+            .from('guest_access_tokens') as any)
             .insert({
                 token,
                 posting_id,
                 expires_at: expiresAt,
+                created_by: user.id,
                 is_masked
-                // In a real scenario, we might want to store guest_email/name in a separate table or json field
             })
             .select()
             .single();
@@ -53,7 +53,6 @@ export async function POST(request: Request) {
         const inviteLink = `${baseUrl}/guest/login?token=${token}`;
 
         // MOCK EMAIL SENDING
-        // Integration Point: Use Resend, SendGrid, or Nodemailer here.
         console.log(`[Email Mock] Sending invite to ${guest_name} <${guest_email}>: ${inviteLink}`);
 
         return NextResponse.json({

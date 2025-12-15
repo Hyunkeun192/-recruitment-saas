@@ -2,13 +2,16 @@
 
 import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
+export const dynamic = 'force-dynamic';
+
+import { Suspense } from 'react';
 import { useState } from 'react';
 
-export default function LoginPage() {
+function LoginPageContent() {
     const supabase = createClient();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const next = searchParams.get('next') || '/candidate/dashboard'; // 기본 이동 경로
+    const next = searchParams.get('next') || '/candidate/dashboard';
 
     const handleGoogleLogin = async () => {
         try {
@@ -61,5 +64,13 @@ export default function LoginPage() {
                 </p>
             </div>
         </div>
+    );
+}
+
+export default function LoginPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <LoginPageContent />
+        </Suspense>
     );
 }

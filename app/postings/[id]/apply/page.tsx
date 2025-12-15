@@ -55,7 +55,7 @@ function ApplicationFormContent() {
         fetchPosting();
     }, [postingId, supabase]);
 
-    const form = useForm<ApplicationFormData>({
+    const form = useForm<any>({
         resolver: zodResolver(applicationFormSchema) as any, // Cast to any to avoid generic mismatch
         defaultValues: {
             personal: { name: "", dob: "", gender: "Male", phone: "", email: "", address: "" },
@@ -65,7 +65,7 @@ function ApplicationFormContent() {
             activities: [],
             military: { veteran_status: false, military_status: "NotApplicable" },
             preferences: { job_type: "Full-time" },
-            blind_mode_enabled: true,
+            blind_mode_enabled: true as any,
         },
         mode: "onBlur",
     });

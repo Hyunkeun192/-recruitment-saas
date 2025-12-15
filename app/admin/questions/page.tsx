@@ -83,7 +83,7 @@ export default function QuestionsPage() {
         e.stopPropagation(); // Prevent row click
         if (!confirm('정말 삭제하시겠습니까?')) return;
 
-        await supabase.from('questions').delete().eq('id', id);
+        await (supabase.from('questions') as any).delete().eq('id', id);
         toast.success('삭제되었습니다.');
         setQuestions(questions.filter(q => q.id !== id));
     };

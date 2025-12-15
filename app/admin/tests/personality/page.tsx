@@ -65,8 +65,8 @@ export default function PersonalityTestManagement() {
         try {
             if (!newTest.title.trim()) return toast.error('검사명을 입력해주세요.');
 
-            const { error } = await supabase
-                .from('tests')
+            const { error } = await (supabase
+                .from('tests') as any)
                 .insert({
                     title: newTest.title,
                     description: newTest.description,
@@ -106,8 +106,8 @@ export default function PersonalityTestManagement() {
         if (!editingTest || !editingTest.title.trim()) return;
 
         try {
-            const { error } = await supabase
-                .from('tests')
+            const { error } = await (supabase
+                .from('tests') as any)
                 .update({
                     title: editingTest.title,
                     description: editingTest.description,

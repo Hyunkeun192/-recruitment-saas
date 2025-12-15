@@ -14,8 +14,8 @@ export async function POST(request: Request) {
         }
 
         // 1. Update Database Status
-        const { data: app, error } = await supabase
-            .from('applications')
+        const { data: app, error } = await (supabase
+            .from('applications') as any)
             .update({ status })
             .eq('id', application_id)
             .select('*, users(full_name, email)') // Get user info for email

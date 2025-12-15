@@ -167,8 +167,7 @@ export default function AptitudeTestBuilder({ params }: PageProps) {
                 .getPublicUrl(filePath);
 
             // 3. Update DB
-            const { error: dbError } = await supabase
-                .from('tests')
+            const { error: dbError } = await (supabase.from('tests') as any)
                 .update({ image_url: publicUrl })
                 .eq('id', id);
 
@@ -215,8 +214,8 @@ export default function AptitudeTestBuilder({ params }: PageProps) {
                     order_index: idx
                 }));
 
-                const { error: insError } = await supabase
-                    .from('test_questions')
+                const { error: insError } = await (supabase
+                    .from('test_questions') as any)
                     .insert(payload);
                 if (insError) throw insError;
             }

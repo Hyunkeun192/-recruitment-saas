@@ -49,7 +49,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
         try {
             // Fix: Cast payload to any to avoid typescript 'never' error
-            await supabase.from('test_results').update(payload as any).eq('id', rId);
+            await (supabase.from('test_results') as any).update(payload).eq('id', rId);
         } catch (e) {
             console.error('Save failed', e);
         }
@@ -180,8 +180,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 if (res.questions_order && Array.isArray(res.questions_order)) {
                     const orderMap = new Map(res.questions_order.map((id: string, idx: number) => [id, idx]));
                     finalQuestions = allQuestionsRaw.sort((a: any, b: any) => {
-                        const idxA = orderMap.get(a.id) ?? 9999;
-                        const idxB = orderMap.get(b.id) ?? 9999;
+                        const idxA = (orderMap.get(a.id) as number) ?? 9999;
+                        const idxB = (orderMap.get(b.id) as number) ?? 9999;
                         return idxA - idxB;
                     });
                 } else {
@@ -248,11 +248,12 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             // Force save with latest data
             if (resultId) {
                 // Fix: Cast payload
-                supabase.from('test_results').update({
+                // Fix: Cast payload
+                (supabase.from('test_results') as any).update({
                     current_index: nextIdx,
                     answers_log: answers,
                     updated_at: new Date().toISOString()
-                } as any).eq('id', resultId).then();
+                }).eq('id', resultId).then();
             }
         }
     };
@@ -301,8 +302,9 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             }
 
             // 3. Save Results
-            await supabase
-                .from('test_results')
+            // 3. Save Results
+            await (supabase
+                .from('test_results') as any)
                 .update({
                     answers_log: answers,
                     elapsed_seconds: elapsedSeconds,
@@ -310,7 +312,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     status: 'COMPLETED',
                     total_score: totalScore,
                     t_score: tScore
-                } as any) // Fix: Cast payload
+                }) // Fix: Cast payload
                 .eq('id', resultId);
 
             toast.success('검사가 완료되었습니다.');
@@ -460,11 +462,11 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                                                                     if (resultId) {
                                                                         const updatedAnswers = { ...answers, [currentIndex]: score };
                                                                         // Fix: Cast payload
-                                                                        supabase.from('test_results').update({
+                                                                        (supabase.from('test_results') as any).update({
                                                                             current_index: nextIdx,
                                                                             answers_log: updatedAnswers,
                                                                             updated_at: new Date().toISOString()
-                                                                        } as any).eq('id', resultId).then();
+                                                                        }).eq('id', resultId).then();
                                                                     }
                                                                 }, 250);
                                                             }

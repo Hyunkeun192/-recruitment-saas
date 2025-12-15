@@ -1,5 +1,5 @@
+import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
-import { Database } from '@/types/database';
 
 export async function POST(request: Request) {
     try {
@@ -8,8 +8,8 @@ export async function POST(request: Request) {
         const { answers, time_spent, application_id } = body;
 
         // 1. Fetch Application & Posting Info to get Test ID
-        const { data: appData } = await supabase
-            .from('applications')
+        const { data: appData } = await (supabase
+            .from('applications') as any)
             .select(`
                 id, 
                 posting_id,
@@ -18,13 +18,13 @@ export async function POST(request: Request) {
             .eq('id', application_id)
             .single();
 
-        const siteConfig = (appData?.postings as any)?.site_config || {};
+        const siteConfig = (appData as any)?.postings?.site_config || {};
         const testId = siteConfig.test_id || null;
 
         // 2. Fetch Questions (server-side score calc)
-        const { data: questions } = await supabase
-            .from('questions')
-            .select('id, correct_answer, score');
+        const { data: questions } = await (supabase
+            .from('questions') as any)
+            .select('id, correct_answer, score, category');
 
         if (!questions) throw new Error('Failed to load questions map');
 
@@ -34,13 +34,13 @@ export async function POST(request: Request) {
         let detailScores: any = {};
 
         // Fetch Test Type
-        const { data: testData } = await supabase
-            .from('tests')
+        const { data: testData } = await (supabase
+            .from('tests') as any)
             .select('type, id')
             .eq('id', testId)
             .single();
 
-        const testType = testData?.type || 'APTITUDE';
+        const testType = (testData as any)?.type || 'APTITUDE';
 
         // Initialize scoredAnswers array
         let scoredAnswers: any[] = [];
@@ -50,19 +50,20 @@ export async function POST(request: Request) {
 
             // A. Fetch necessary data: Norms, Competencies
             const [normsResult, competenciesResult] = await Promise.all([
-                supabase.from('test_norms').select('*').eq('test_id', testId),
-                supabase.from('competencies').select(`
+                (supabase.from('test_norms') as any).select('*').eq('test_id', testId),
+                (supabase.from('competencies') as any).select(`
+                    id,
                     name,
                     competency_scales ( scale_name )
                 `).eq('test_id', testId)
             ]);
 
-            const norms = normsResult.data || [];
-            const competencies = competenciesResult.data || [];
+            const norms = (normsResult as any).data || [];
+            const competencies = (competenciesResult as any).data || [];
 
             // Helper to get T-Score
             const calculateTScore = (raw: number, cat: string) => {
-                const norm = norms.find(n => n.category_name === cat);
+                const norm = norms.find((n: any) => n.category_name === cat);
                 if (!norm || !norm.std_dev_value || norm.std_dev_value === 0) return 50; // Default to mean if no norm
                 return 50 + 10 * ((raw - norm.mean_value) / norm.std_dev_value);
             };
@@ -71,38 +72,23 @@ export async function POST(request: Request) {
             const scaleRawScores: Record<string, number> = {};
 
             scoredAnswers = Object.entries(answers).map(([qId, selectedIdx]) => {
-                const question = questions.find(q => q.id === qId);
+                const question = questions.find((q: any) => q.id === qId);
                 if (!question) return null;
 
                 // Assumption: selectedIdx is 0-based index. Score = index + 1.
-                // TODO: Implement Reverse Scoring check if needed in future
-                const scoreValue = (typeof selectedIdx === 'number' ? selectedIdx : parseInt(selectedIdx)) + 1;
-
-                if (question.scoring_category) { // Assuming we map category from somewhere, or duplicate logic
-                    // Wait, we only fetched ID/correct_answer/score from 'questions'.
-                    // We need 'category' for personality questions.
-                }
+                const scoreValue = (typeof selectedIdx === 'number' ? selectedIdx : parseInt(selectedIdx as string)) + 1;
 
                 return {
                     question_id: qId,
                     selected_option: selectedIdx,
                     score: scoreValue,
-                    category: null // Placeholder, will fill if we fetch categories
+                    category: (question as any).category // Use category from question
                 };
             }).filter(Boolean);
 
-            // Re-fetch questions with category for correct grouping
-            const { data: qDetails } = await supabase
-                .from('questions')
-                .select('id, category')
-                .in('id', Object.keys(answers));
-
-            const categoryMap = new Map(qDetails?.map(q => [q.id, q.category]) || []);
-
             // Sum up Scale Raw Scores
             scoredAnswers.forEach((ans: any) => {
-                const cat = categoryMap.get(ans.question_id);
-                ans.category = cat;
+                const cat = ans.category;
                 if (cat) {
                     scaleRawScores[cat] = (scaleRawScores[cat] || 0) + ans.score;
                 }
@@ -135,7 +121,7 @@ export async function POST(request: Request) {
             // E. Calculate Total Score
             // Total Raw = Sum of Competency T-Scores
             let totalRaw = 0;
-            Object.values(competencyScores).forEach(c => {
+            Object.values(competencyScores).forEach((c: any) => {
                 totalRaw += c.t_score;
             });
             const totalT = calculateTScore(totalRaw, 'TOTAL');
@@ -150,22 +136,20 @@ export async function POST(request: Request) {
         } else {
             // --- APTITUDE (Legacy) SCORING LOGIC ---
 
-            // Re-fetch questions with category if needed, but for now stick to simple logic
-            // Need to fix calculating Max Score properly if possible
             if (testId) {
-                const { data: testQs } = await supabase
-                    .from('test_questions')
+                const { data: testQs } = await (supabase
+                    .from('test_questions') as any)
                     .select('questions(score)')
                     .eq('test_id', testId);
                 maxScore = testQs?.reduce((acc: number, curr: any) => acc + (curr.questions?.score || 0), 0) || 0;
             }
 
             scoredAnswers = Object.entries(answers).map(([qId, selectedIdx]) => {
-                const question = questions.find(q => q.id === qId);
+                const question = questions.find((q: any) => q.id === qId);
                 if (!question) return null;
 
-                const isCorrect = question.correct_answer === selectedIdx;
-                if (isCorrect) totalScore += question.score;
+                const isCorrect = (question as any).correct_answer === selectedIdx;
+                if (isCorrect) totalScore += (question as any).score;
 
                 return {
                     question_id: qId,
@@ -181,8 +165,8 @@ export async function POST(request: Request) {
             scoring_breakdown: detailScores
         };
 
-        const { error: resultError } = await supabase
-            .from('test_results')
+        const { error: resultError } = await (supabase
+            .from('test_results') as any)
             .insert({
                 application_id: application_id,
                 total_score: totalScore,
@@ -195,8 +179,8 @@ export async function POST(request: Request) {
         if (resultError) throw resultError;
 
         // 5. Update Application Status
-        await supabase
-            .from('applications')
+        await (supabase
+            .from('applications') as any)
             .update({ status: 'TEST_COMPLETED' })
             .eq('id', application_id);
 

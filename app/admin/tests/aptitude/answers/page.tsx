@@ -36,8 +36,8 @@ export default function AptitudeAnswerManagement() {
 
             if (error) throw error;
             setTests(data);
-            if (data.length > 0 && !selectedTestId) {
-                setSelectedTestId(data[0].id);
+            if ((data as any).length > 0 && !selectedTestId) {
+                setSelectedTestId((data as any)[0].id);
             }
         } catch (error) {
             console.error(error);

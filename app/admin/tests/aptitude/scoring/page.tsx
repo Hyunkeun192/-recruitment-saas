@@ -45,8 +45,8 @@ export default function AptitudeScoringManagement() {
 
             if (error) throw error;
             setTests(data);
-            if (data.length > 0 && !selectedTestId) {
-                setSelectedTestId(data[0].id);
+            if (data && data.length > 0 && !selectedTestId) {
+                setSelectedTestId((data as any)[0].id);
             }
         } catch (error) {
             console.error(error);
@@ -118,8 +118,8 @@ export default function AptitudeScoringManagement() {
             }));
 
             // Use upsert on unique constraint (test_id, category_name)
-            const { error } = await supabase
-                .from('test_norms')
+            const { error } = await (supabase
+                .from('test_norms') as any)
                 .upsert(upsertData, { onConflict: 'test_id, category_name' });
 
             if (error) throw error;
@@ -146,8 +146,8 @@ export default function AptitudeScoringManagement() {
                             key={test.id}
                             onClick={() => setSelectedTestId(test.id)}
                             className={`w-full text-left p-3 rounded-lg text-sm mb-1 transition-colors ${selectedTestId === test.id
-                                    ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100'
-                                    : 'text-slate-600 hover:bg-slate-50'
+                                ? 'bg-blue-50 text-blue-700 font-bold border border-blue-100'
+                                : 'text-slate-600 hover:bg-slate-50'
                                 }`}
                         >
                             <div className="line-clamp-1">{test.title}</div>

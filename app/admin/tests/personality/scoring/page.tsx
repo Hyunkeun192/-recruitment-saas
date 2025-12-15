@@ -48,7 +48,7 @@ export default function PersonalityScoringManagement() {
             if (error) throw error;
             setTests(data);
             if (data && data.length > 0 && !selectedTestId) {
-                setSelectedTestId(data[0].id);
+                setSelectedTestId((data as any)[0].id);
             }
         } catch (error) {
             console.error(error);
@@ -131,9 +131,9 @@ export default function PersonalityScoringManagement() {
             }));
 
             // Use upsert on unique constraint (test_id, category_name)
-            const { error } = await supabase
-                .from('test_norms')
-                .upsert(upsertData, { onConflict: 'test_id, category_name' }) as any;
+            const { error } = await (supabase
+                .from('test_norms') as any)
+                .upsert(upsertData, { onConflict: 'test_id, category_name' });
 
             if (error) throw error;
             toast.success('채점 기준이 저장되었습니다.');

@@ -23,7 +23,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
         }
 
-        if (tokenData.is_revoked || new Date(tokenData.expires_at) < new Date()) {
+        if ((tokenData as any).is_revoked || new Date((tokenData as any).expires_at) < new Date()) {
             return NextResponse.json({ error: 'Token has expired' }, { status: 401 });
         }
 
@@ -31,8 +31,8 @@ export async function POST(request: Request) {
         // Note: evaluator_id is left NULL for guests as they don't have a user_id.
         // We could store guest_token_id in a metadata field if needed, but for now standard schema applies.
 
-        const { error: insertError } = await supabase
-            .from('evaluation_scores')
+        const { error: insertError } = await (supabase
+            .from('evaluation_scores') as any)
             .insert({
                 application_id,
                 scores: score_data, // JSONB

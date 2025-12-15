@@ -45,10 +45,10 @@ export default function PostingsPage() {
                 .single();
 
             if (userData) {
-                setUserRole(userData.role);
+                setUserRole((userData as any).role);
             } else {
                 // [SELF-HEALING] If user missing in public.users, create it as SUPER_ADMIN
-                const { error: insertError } = await supabase.from('users').insert({
+                const { error: insertError } = await (supabase.from('users') as any).insert({
                     id: user.id,
                     email: user.email,
                     role: 'SUPER_ADMIN',
@@ -72,7 +72,7 @@ export default function PostingsPage() {
                 .single();
 
             if (memberData) {
-                setCompanyId(memberData.company_id);
+                setCompanyId((memberData as any).company_id);
             }
         }
 

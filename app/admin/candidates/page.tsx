@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+export const dynamic = 'force-dynamic';
+
 import { supabase } from '@/lib/supabase';
 import { Loader2, Plus, Users, ArrowLeft, Check, X, ChevronRight } from 'lucide-react';
 import InviteGuestModal from '@/components/admin/InviteGuestModal';

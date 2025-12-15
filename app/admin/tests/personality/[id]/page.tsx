@@ -62,7 +62,7 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                 .single();
             if (testError) throw testError;
             setTest(testData);
-            setIsRandom(testData.is_random || false);
+            setIsRandom((testData as any).is_random || false);
 
             // 2. Fetch All Personality Questions
             const { data: allQuestions, error: qError } = await supabase
@@ -187,9 +187,9 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
 
             // 3. Update DB
             // Fix: Cast update payload
-            const { error: dbError } = await supabase
-                .from('tests')
-                .update({ image_url: publicUrl } as any)
+            const { error: dbError } = await (supabase
+                .from('tests') as any)
+                .update({ image_url: publicUrl })
                 .eq('id', id);
 
             if (dbError) throw dbError;
@@ -226,9 +226,9 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
         try {
             // 1. Update Test Settings (is_random)
             // Fix: Cast update payload
-            const { error: updateError } = await supabase
-                .from('tests')
-                .update({ is_random: isRandom } as any)
+            const { error: updateError } = await (supabase
+                .from('tests') as any)
+                .update({ is_random: isRandom })
                 .eq('id', test.id);
             if (updateError) throw updateError;
 
@@ -249,9 +249,9 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                 }));
 
                 // Fix: Cast insert payload
-                const { error: insError } = await supabase
-                    .from('test_questions')
-                    .insert(payload as any);
+                const { error: insError } = await (supabase
+                    .from('test_questions') as any)
+                    .insert(payload);
                 if (insError) throw insError;
             }
 

@@ -65,13 +65,13 @@ export default function AptitudeTestManagement() {
         try {
             if (!newTest.title.trim()) return toast.error('검사명을 입력해주세요.');
 
-            const { error } = await supabase
-                .from('tests')
+            const { error } = await (supabase
+                .from('tests') as any)
                 .insert({
                     title: newTest.title,
                     description: newTest.description,
                     time_limit: newTest.time_limit,
-                    type: 'APTITUDE',
+                    type: 'PERSONALITY',
                     status: 'DRAFT'
                 });
 
@@ -108,8 +108,8 @@ export default function AptitudeTestManagement() {
         if (!editingTest || !editingTest.title.trim()) return;
 
         try {
-            const { error } = await supabase
-                .from('tests')
+            const { error } = await (supabase
+                .from('tests') as any)
                 .update({
                     title: editingTest.title,
                     description: editingTest.description,

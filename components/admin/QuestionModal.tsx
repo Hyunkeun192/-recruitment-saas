@@ -40,7 +40,7 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType,
             const fetchCategories = async () => {
                 const { data } = await supabase.from('questions').select('category');
                 if (data) {
-                    const unique = Array.from(new Set(data.map(q => q.category).filter(Boolean)));
+                    const unique = Array.from(new Set(data.map((q: any) => q.category).filter(Boolean)));
                     setExistingCategories(unique);
                 }
             };
@@ -203,15 +203,15 @@ export default function QuestionModal({ isOpen, onClose, onSuccess, defaultType,
             let error;
             if (initialData) {
                 // UPDATE
-                const { error: updateError } = await supabase
-                    .from('questions')
+                const { error: updateError } = await (supabase
+                    .from('questions') as any)
                     .update(payload)
                     .eq('id', initialData.id);
                 error = updateError;
             } else {
                 // INSERT
-                const { error: insertError } = await supabase
-                    .from('questions')
+                const { error: insertError } = await (supabase
+                    .from('questions') as any)
                     .insert(payload);
                 error = insertError;
             }

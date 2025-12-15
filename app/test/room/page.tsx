@@ -76,7 +76,7 @@ export default function TestRoomPage() {
                 .single();
 
             if (testResult) {
-                setTestId(testResult.id);
+                setTestId((testResult as any).id);
             } else {
                 console.warn('No active test session found (this might be a demo)');
             }
@@ -94,8 +94,8 @@ export default function TestRoomPage() {
                     .eq('user_id', user.id)
                     .single();
 
-                if (appData && appData.postings) {
-                    const siteConfig = (appData.postings as any).site_config || {};
+                if (appData && (appData as any).postings) {
+                    const siteConfig = (appData as any).postings.site_config || {};
                     const assignedTestId = siteConfig.test_id;
 
                     if (assignedTestId) {
@@ -106,8 +106,8 @@ export default function TestRoomPage() {
                             .eq('id', assignedTestId)
                             .single();
 
-                        const isRandom = testInfo?.is_random || false;
-                        const timeLimit = testInfo?.time_limit || 60;
+                        const isRandom = (testInfo as any)?.is_random || false;
+                        const timeLimit = (testInfo as any)?.time_limit || 60;
 
                         // 3. Fetch Assigned Questions
                         const { data: tqData } = await supabase

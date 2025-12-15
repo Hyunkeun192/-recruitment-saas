@@ -20,7 +20,7 @@ export async function GET(request: Request) {
 
         if (tokenError || !tokenData) return NextResponse.json({ error: 'Invalid Token' }, { status: 401 });
 
-        if (new Date(tokenData.expires_at) < new Date()) {
+        if ((tokenData as any).is_revoked || new Date((tokenData as any).expires_at) < new Date()) {
             return NextResponse.json({ error: 'Token Expired' }, { status: 401 });
         }
 
@@ -35,7 +35,7 @@ export async function GET(request: Request) {
         test_results ( total_score ),
         users ( full_name )
       `)
-            .eq('posting_id', tokenData.posting_id)
+            .eq('posting_id', (tokenData as any).posting_id)
             .eq('status', 'TEST_COMPLETED') // Only show those who finished test
             .order('created_at', { ascending: false });
 

@@ -86,11 +86,15 @@ export default function TestsDashboard() {
     const toggleStatus = async (test: TestSummary) => {
         const newStatus = test.status === 'ACTIVE' ? 'DRAFT' : 'ACTIVE';
         try {
-            const { error } = await supabase
-                .from('tests')
+            const { error } = await (supabase
+                .from('tests') as any)
                 .update({ status: newStatus })
                 .eq('id', test.id);
-
+            // The following lines were part of the instruction but seem to be out of context for this function.
+            // They refer to 'data' and 'selectedTestId' which are not defined here.
+            // if (data && data.length > 0 && !selectedTestId) {
+            //     setSelectedTestId((data as any)[0].id);
+            // }
             if (error) throw error;
 
             toast.success(`검사 상태가 ${newStatus === 'ACTIVE' ? '활성화' : '비활성화'}되었습니다.`);
@@ -201,8 +205,8 @@ export default function TestsDashboard() {
                                             </td>
                                             <td className="px-6 py-4">
                                                 <span className={`px-2 py-1 rounded text-xs font-bold ${test.type === 'APTITUDE'
-                                                        ? 'bg-blue-50 text-blue-700'
-                                                        : 'bg-indigo-50 text-indigo-700'
+                                                    ? 'bg-blue-50 text-blue-700'
+                                                    : 'bg-indigo-50 text-indigo-700'
                                                     }`}>
                                                     {test.type === 'APTITUDE' ? '적성검사' : '인성검사'}
                                                 </span>
@@ -220,8 +224,8 @@ export default function TestsDashboard() {
                                                 <button
                                                     onClick={() => toggleStatus(test)}
                                                     className={`flex items-center gap-2 px-3 py-1.5 rounded-full transition-colors ${test.status === 'ACTIVE'
-                                                            ? 'bg-green-100 text-green-700 hover:bg-green-200'
-                                                            : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                                                        ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                                        : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                                                         }`}
                                                 >
                                                     {test.status === 'ACTIVE' ? <ToggleRight size={18} /> : <ToggleLeft size={18} />}
