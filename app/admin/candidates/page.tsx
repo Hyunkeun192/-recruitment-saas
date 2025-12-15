@@ -69,7 +69,9 @@ export default function CandidatesPage() {
         const { data: rawPostings } = await supabase.from('postings').select('id, title');
         if (!rawPostings) return;
 
-        const stats = await Promise.all(rawPostings.map(async (p) => {
+        const typedPostings = rawPostings as { id: string; title: string }[];
+
+        const stats = await Promise.all(typedPostings.map(async (p) => {
             const { count } = await supabase.from('applications').select('*', { count: 'exact', head: true }).eq('posting_id', p.id);
             return { id: p.id, title: p.title, applicant_count: count || 0 };
         }));
