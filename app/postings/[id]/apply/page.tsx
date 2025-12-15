@@ -56,7 +56,7 @@ function ApplicationFormContent() {
     }, [postingId, supabase]);
 
     const form = useForm<ApplicationFormData>({
-        resolver: zodResolver(applicationFormSchema),
+        resolver: zodResolver(applicationFormSchema) as any, // Cast to any to avoid generic mismatch
         defaultValues: {
             personal: { name: "", dob: "", gender: "Male", phone: "", email: "", address: "" },
             education: [],
