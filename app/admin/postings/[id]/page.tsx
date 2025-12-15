@@ -44,13 +44,14 @@ export default function PostingDetailPage() {
         }
 
         if (data) {
-            setTitle(data.title);
-            setDescription(data.description || '');
-            setIsActive(data.is_active);
-            setImageUrl(data.image_url || null);
+            const p = data as any;
+            setTitle(p.title);
+            setDescription(p.description || '');
+            setIsActive(p.is_active);
+            setImageUrl(p.image_url || null);
 
             // Load Site Config
-            const config = data.site_config || { intro_type: 'TYPE_A', questions: [] };
+            const config = p.site_config || { intro_type: 'TYPE_A', questions: [] };
             setIntroType(config.intro_type || 'TYPE_A');
             setQuestions(config.questions || []);
             setSelectedTestId(config.test_id || '');
