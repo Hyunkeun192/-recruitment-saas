@@ -186,9 +186,10 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                 .getPublicUrl(filePath);
 
             // 3. Update DB
+            // Fix: Cast update payload
             const { error: dbError } = await supabase
                 .from('tests')
-                .update({ image_url: publicUrl })
+                .update({ image_url: publicUrl } as any)
                 .eq('id', id);
 
             if (dbError) throw dbError;
@@ -224,9 +225,10 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
         setIsSaving(true);
         try {
             // 1. Update Test Settings (is_random)
+            // Fix: Cast update payload
             const { error: updateError } = await supabase
                 .from('tests')
-                .update({ is_random: isRandom })
+                .update({ is_random: isRandom } as any)
                 .eq('id', test.id);
             if (updateError) throw updateError;
 
@@ -246,9 +248,10 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                     order_index: idx
                 }));
 
+                // Fix: Cast insert payload
                 const { error: insError } = await supabase
                     .from('test_questions')
-                    .insert(payload);
+                    .insert(payload as any);
                 if (insError) throw insError;
             }
 
