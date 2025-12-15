@@ -94,12 +94,12 @@ export default function PostingsPage() {
         }
 
         setIsCreating(true); // Use isCreating for button state
-        const { error } = await supabase.from('postings').insert({
+        const { error } = await (supabase.from('postings') as any).insert({
             title,
             company_id: companyId, // can be null if SUPER_ADMIN (global posting)
             jds: "{}",
             is_active: true
-        } as any);
+        });
 
         if (error) {
             toast.error("공고 생성 실패: " + error.message);

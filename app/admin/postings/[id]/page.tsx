@@ -73,8 +73,7 @@ export default function PostingDetailPage() {
             test_id: selectedTestId
         };
 
-        const { error } = await supabase
-            .from('postings')
+        const { error } = await (supabase.from('postings') as any)
             .update({
                 title,
                 description,
