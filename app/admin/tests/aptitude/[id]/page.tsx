@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Search, Plus, Trash2, ArrowUp, ArrowDown, Save, GripVertical } from 'lucide-react';
+import { ChevronLeft, Search, Plus, Trash2, ArrowUp, ArrowDown, Save, GripVertical, Upload, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PageProps {
@@ -145,6 +145,45 @@ export default function AptitudeTestBuilder({ params }: PageProps) {
         setDraggedIdx(null);
     };
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${id}-${Date.now()}.${fileExt}`;
+            const filePath = `${fileName}`;
+
+            // 1. Upload to Storage
+            const { error: uploadError } = await supabase.storage
+                .from('test-images')
+                .upload(filePath, file);
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('test-images')
+                .getPublicUrl(filePath);
+
+            // 3. Update DB
+            const { error: dbError } = await supabase
+                .from('tests')
+                .update({ image_url: publicUrl })
+                .eq('id', id);
+
+            if (dbError) throw dbError;
+
+            // 4. Update Local State
+            setTest((prev: any) => ({ ...prev, image_url: publicUrl }));
+            toast.success('대표 이미지가 변경되었습니다.');
+
+        } catch (error) {
+            console.error('Image upload failed:', error);
+            toast.error('이미지 업로드 실패');
+        }
+    };
+
     // Modified moveItem for DnD (swap arbitrary indices)
     const moveItem = (fromIdx: number, toIdx: number) => {
         if (fromIdx === toIdx) return;
@@ -201,11 +240,34 @@ export default function AptitudeTestBuilder({ params }: PageProps) {
     return (
         <div className="h-[calc(100vh-140px)] flex flex-col">
             {/* Header */}
+            {/* Header */}
             <div className="flex justify-between items-center mb-6 shrink-0">
                 <div className="flex items-center gap-4">
                     <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
                         <ChevronLeft size={24} />
                     </button>
+
+                    {/* Cover Image Upload Trigger */}
+                    <div className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer" onClick={() => document.getElementById('cover-upload')?.click()}>
+                        {test.image_url ? (
+                            <img src={test.image_url} alt="Cover" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <ImageIcon size={24} />
+                            </div>
+                        )}
+                        <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                            <Upload size={16} className="text-white" />
+                        </div>
+                        <input
+                            id="cover-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                        />
+                    </div>
+
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                             {test.title}

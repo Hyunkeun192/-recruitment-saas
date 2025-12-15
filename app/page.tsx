@@ -1,100 +1,135 @@
+'use client';
+
 import Link from "next/link";
-import { ArrowRight, ShieldCheck, Users, FileText } from "lucide-react";
+import Image from "next/image";
+import { MessageSquare, Scale, BrainCircuit, Link as LinkIcon, ArrowRight } from "lucide-react";
 
 /**
  * 메인 랜딩 페이지 컴포넌트
- * 
- * 방문자에게 서비스의 주요 기능을 소개하고
- * 관리자 및 지원자, 게스트 포털로의 진입점을 제공합니다.
+ * Concept: Clean, Minimalist, Gen Z Target
+ * Styles: Bento Grid, Pastel Accents
+ * Update: Hero section text removed, image enlarged.
  */
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900 text-white font-sans selection:bg-blue-500 selection:text-white">
-      {/* 네비게이션 바 */}
-      <nav className="p-6 flex justify-between items-center max-w-7xl mx-auto">
-        <div className="font-bold text-2xl tracking-tighter">MEETUP</div>
-        <div className="flex gap-6 text-sm font-medium text-slate-300">
-          <Link href="#" className="hover:text-white transition-colors">주요 기능</Link>
-          <Link href="#" className="hover:text-white transition-colors">요금 안내</Link>
-          <Link href="#" className="hover:text-white transition-colors">문의하기</Link>
-        </div>
-        <div className="flex gap-4">
-          <Link
-            href="/admin/login"
-            className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-sm font-medium transition-all backdrop-blur-sm"
-          >
-            관리자 로그인
-          </Link>
-          <Link
-            href="/jobs"
-            className="px-4 py-2 bg-blue-500 hover:bg-blue-400 text-white rounded-lg text-sm font-medium transition-all shadow-lg hover:shadow-blue-500/25"
-          >
-            채용 공고 보기
-          </Link>
+    <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#B3E5FC] selection:text-slate-900">
+
+      {/* Navigation */}
+      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div className="font-bold text-2xl tracking-tighter">Fit-Log.</div>
+          <div className="flex gap-4">
+            <Link
+              href="/admin/login"
+              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+            >
+              Enter for Admin
+            </Link>
+          </div>
         </div>
       </nav>
 
-      {/* 히어로 섹션 */}
-      <main className="max-w-7xl mx-auto px-6 pt-20 pb-16 flex flex-col items-center text-center">
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs font-semibold mb-8 backdrop-blur-md">
-          <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse"></span>
-          PIPA 개인정보보호법 준수 v1.0
-        </div>
+      <main className="max-w-7xl mx-auto px-6 pt-32 pb-24">
 
-        <h1 className="text-5xl md:text-7xl font-bold tracking-tight mb-6 bg-gradient-to-b from-white to-slate-400 bg-clip-text text-transparent">
-          안전하고 강력한 <br className="hidden md:block" />
-          AI 기반 채용 플랫폼
-        </h1>
+        {/* Hero Section */}
+        <section className="flex flex-col items-center text-center mb-16 pt-4">
 
-        <p className="text-lg md:text-xl text-slate-300 max-w-2xl mb-10 leading-relaxed word-keep-all">
-          지원자 접수부터 온라인 역량 평가, 결과 분석까지 하나로 해결하세요.
-          자동화된 테스트와 완벽한 보안으로 채용 프로세스를 혁신합니다.
-        </p>
+          {/* Expanded Image Area (16:9 Wide) */}
+          <div className="relative w-[80%] aspect-video group rounded-3xl overflow-hidden shadow-sm">
+            <div className="absolute inset-0 bg-gradient-to-tr from-[#FFCCBC]/10 to-[#B3E5FC]/10 opacity-30 group-hover:opacity-50 transition-opacity"></div>
+            <div className="relative w-full h-full transform transition-transform duration-1000 ease-out hover:scale-[1.02]">
+              <Image
+                src="/images/hero-wide-puzzle.png"
+                alt="Puzzle Fit Illustration"
+                fill
+                className="object-cover"
+                priority
+              />
+            </div>
+          </div>
 
-        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
-          {/* '관리자로 시작하기' 버튼 제거됨 */}
-          <Link
-            href="/test/demo"
-            className="flex items-center justify-center gap-2 px-8 py-3.5 bg-white/5 hover:bg-white/10 text-white border border-white/10 rounded-xl font-semibold transition-all backdrop-blur-sm"
-          >
-            데모 테스트 체험
+        </section>
+
+        {/* Services Grid (Bento Grid Layout) */}
+        <section className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[minmax(300px,auto)]">
+
+          {/* Card 1: Personality */}
+          <Link href="/candidate/personality" className="group relative bg-white border border-slate-100 rounded-[2rem] p-10 shadow-sm hover:shadow-xl hover:shadow-[#FFCCBC]/20 transition-all duration-500 overflow-hidden flex flex-col justify-between cursor-pointer">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFCCBC] rounded-full blur-[80px] opacity-10 group-hover:opacity-20 transition-opacity translate-x-1/2 -translate-y-1/2"></div>
+
+            <div className="w-16 h-16 bg-[#FFCCBC]/20 rounded-2xl flex items-center justify-center text-[#FF8A65] mb-6 group-hover:scale-110 transition-transform duration-300">
+              <Scale size={32} strokeWidth={2.5} />
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-bold mb-3 group-hover:text-[#FF8A65] transition-colors">인성검사:<br />솔직함의 전략</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                착한 척하면 탈락합니다.<br />
+                일관성을 지키세요.
+              </p>
+            </div>
           </Link>
-        </div>
 
-        {/* 주요 기능 그리드 */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-24 w-full text-left">
-          <FeatureCard
-            icon={<ShieldCheck className="text-emerald-400" size={24} />}
-            title="법적 준수 및 보안"
-            desc="모든 개인정보는 AES-256으로 암호화됩니다. 외부 평가자를 위한 블라인드 모드를 지원합니다."
-          />
-          <FeatureCard
-            icon={<FileText className="text-amber-400" size={24} />}
-            title="엑셀 문제은행 연동"
-            desc="1000개 이상의 문제를 엑셀로 한 번에 업로드하고, 자동으로 테스트 세트를 생성하세요."
-          />
-          <FeatureCard
-            icon={<Users className="text-pink-400" size={24} />}
-            title="부정행위 방지 시스템"
-            desc="화면 이탈 감지, 포커스 모니터링 등 강력한 안티 치팅 기술이 적용되어 있습니다."
-          />
-        </div>
+          {/* Card 2: Aptitude */}
+          <Link href="/candidate/aptitude" className="group relative bg-white border border-slate-100 rounded-[2rem] p-10 shadow-sm hover:shadow-xl hover:shadow-[#B3E5FC]/20 transition-all duration-500 overflow-hidden flex flex-col justify-between cursor-pointer">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-[#B3E5FC] rounded-full blur-[80px] opacity-10 group-hover:opacity-20 transition-opacity translate-x-1/2 -translate-y-1/2"></div>
+
+            <div className="w-16 h-16 bg-[#B3E5FC]/30 rounded-2xl flex items-center justify-center text-[#039BE5] mb-6 group-hover:scale-110 transition-transform duration-300">
+              <BrainCircuit size={32} strokeWidth={2.5} />
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-bold mb-3 group-hover:text-[#039BE5] transition-colors">적성검사:<br />뇌지컬 트레이닝</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                매일 10분,<br />
+                일머리 근육을 키우세요.
+              </p>
+            </div>
+          </Link>
+
+          {/* Card 3: Interview */}
+          <div
+            onClick={() => alert("추후 서비스 오픈 예정입니다.")}
+            className="group relative bg-white border border-slate-100 rounded-[2rem] p-10 shadow-sm hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-500 overflow-hidden flex flex-col justify-between cursor-pointer"
+          >
+            <div className="absolute top-0 right-0 w-64 h-64 bg-slate-100 rounded-full blur-[80px] opacity-40 group-hover:opacity-60 transition-opacity translate-x-1/2 -translate-y-1/2"></div>
+
+            <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center text-slate-600 mb-6 group-hover:scale-110 transition-transform duration-300">
+              <LinkIcon size={32} strokeWidth={2.5} />
+            </div>
+
+            <div>
+              <h3 className="text-2xl font-bold mb-3 group-hover:text-slate-600 transition-colors">면접:<br />경험의 연결</h3>
+              <p className="text-slate-500 leading-relaxed font-medium">
+                내 경험을 기업의 언어로<br />
+                통역해 드립니다.
+              </p>
+            </div>
+          </div>
+
+        </section>
+
       </main>
-    </div>
-  );
-}
 
-/**
- * 기능 소개 카드 컴포넌트
- */
-function FeatureCard({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
-  return (
-    <div className="p-6 rounded-2xl bg-white/5 border border-white/10 hover:border-white/20 transition-colors backdrop-blur-sm">
-      <div className="mb-4 w-12 h-12 rounded-lg bg-white/5 flex items-center justify-center">
-        {icon}
+      {/* Footer */}
+      <footer className="w-full py-10 border-t border-slate-100">
+        <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
+          <div className="text-sm font-bold text-slate-400">
+            10년 차 채용 설계자의 Fit-Log
+          </div>
+          <div className="text-xs text-slate-300">
+            © 2024 Fit-Log
+          </div>
+        </div>
+      </footer>
+
+      {/* Floating Action Button */}
+      <div className="fixed bottom-8 right-8 z-50">
+        <button className="w-14 h-14 bg-slate-900 rounded-full shadow-2xl flex items-center justify-center text-white hover:scale-110 transition-transform hover:bg-[#FFCCBC] hover:text-slate-900 group">
+          <MessageSquare size={24} className="group-hover:animate-pulse" />
+        </button>
       </div>
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      <p className="text-slate-400 text-sm leading-relaxed word-keep-all">{desc}</p>
+
     </div>
   );
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ChevronLeft, Search, Plus, Trash2, Save, GripVertical, Shuffle } from 'lucide-react';
+import { ChevronLeft, Search, Plus, Trash2, Save, GripVertical, Shuffle, Upload, Image as ImageIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface PageProps {
@@ -28,8 +28,8 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
 
     // Settings
     const [isRandom, setIsRandom] = useState(false);
-
     const [isSaving, setIsSaving] = useState(false);
+    const [isUploading, setIsUploading] = useState(false);
 
     // Drag & Drop State
     const [draggedIdx, setDraggedIdx] = useState<number | null>(null);
@@ -163,6 +163,51 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
         setAvailableQuestions(availableQuestions.filter(q => !addedIds.has(q.id)));
     };
 
+    const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        setIsUploading(true);
+        try {
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${id}-${Date.now()}.${fileExt}`;
+            const filePath = `covers/${fileName}`;
+
+            // 1. Upload to Storage (Use existing 'questions' bucket)
+            const { error: uploadError } = await supabase.storage
+                .from('questions')
+                .upload(filePath, file, { upsert: true });
+
+            if (uploadError) throw uploadError;
+
+            // 2. Get Public URL
+            const { data: { publicUrl } } = supabase.storage
+                .from('questions')
+                .getPublicUrl(filePath);
+
+            // 3. Update DB
+            const { error: dbError } = await supabase
+                .from('tests')
+                .update({ image_url: publicUrl })
+                .eq('id', id);
+
+            if (dbError) throw dbError;
+
+            // 4. Update Local State
+            setTest((prev: any) => ({ ...prev, image_url: publicUrl }));
+            toast.success('대표 이미지가 변경되었습니다.');
+
+        } catch (error: any) {
+            console.error('Image upload failed:', error);
+            console.error('Error details:', JSON.stringify(error, null, 2));
+            toast.error(`이미지 업로드 실패: ${error.message || '알 수 없는 오류'}`);
+        } finally {
+            setIsUploading(false);
+            // Reset input to allow selecting the same file again
+            e.target.value = '';
+        }
+    };
+
     const moveItem = (fromIdx: number, toIdx: number) => {
         if (fromIdx === toIdx) return;
         setTestQuestions(prev => {
@@ -231,6 +276,36 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                     <button onClick={() => router.back()} className="p-2 hover:bg-slate-100 rounded-full text-slate-500">
                         <ChevronLeft size={24} />
                     </button>
+
+                    {/* Cover Image Upload Trigger */}
+                    <div className="relative group w-16 h-16 rounded-xl overflow-hidden border border-slate-200 bg-slate-100 shrink-0 cursor-pointer" onClick={() => !isUploading && document.getElementById('cover-upload')?.click()}>
+                        {isUploading ? (
+                            <div className="w-full h-full flex items-center justify-center bg-slate-50">
+                                <div className="w-5 h-5 border-2 border-primary border-t-transparent rounded-full animate-spin text-blue-600" />
+                            </div>
+                        ) : test.image_url ? (
+                            <img src={test.image_url} alt="Cover" className="w-full h-full object-cover" />
+                        ) : (
+                            <div className="w-full h-full flex items-center justify-center text-slate-400">
+                                <ImageIcon size={24} />
+                            </div>
+                        )}
+
+                        {!isUploading && (
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                <Upload size={16} className="text-white" />
+                            </div>
+                        )}
+                        <input
+                            id="cover-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                            disabled={isUploading}
+                        />
+                    </div>
+
                     <div>
                         <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
                             {test.title}
@@ -240,7 +315,7 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                         </h1>
                         <p className="text-slate-500 text-sm">총 {testQuestions.length}문항 선택됨</p>
                     </div>
-                </div>
+                </div >
 
                 <div className="flex items-center gap-4">
                     {/* Random Toggle */}
@@ -269,12 +344,12 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                         {isSaving ? '저장 중...' : '구성 저장하기'}
                     </button>
                 </div>
-            </div>
+            </div >
 
             {/* Main Content - Two Panes */}
-            <div className="flex-1 flex gap-6 min-h-0">
+            < div className="flex-1 flex gap-6 min-h-0" >
                 {/* Left Panel: Available Questions */}
-                <div className="w-1/2 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+                < div className="w-1/2 flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden" >
                     <div className="p-4 border-b bg-slate-50 flex flex-col gap-3">
                         <div className="flex justify-between items-center">
                             <h3 className="font-bold text-black">문항 보관함 ({filteredQuestions.length})</h3>
@@ -323,10 +398,10 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                             </div>
                         ))}
                     </div>
-                </div>
+                </div >
 
                 {/* Right Panel: Selected Questions */}
-                <div className="w-1/2 flex flex-col bg-slate-50 rounded-2xl border border-slate-200/60 overflow-hidden">
+                < div className="w-1/2 flex flex-col bg-slate-50 rounded-2xl border border-slate-200/60 overflow-hidden" >
                     <div className="p-4 border-b bg-white flex justify-between items-center">
                         <h3 className="font-bold text-black">
                             구성된 검사지 ({testQuestions.length})
@@ -378,51 +453,53 @@ export default function PersonalityTestBuilder({ params }: PageProps) {
                             </div>
                         ))}
                     </div>
-                </div>
-            </div>
+                </div >
+            </div >
 
             {/* Question Detail Modal (Display Only) */}
-            {selectedQuestion && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setSelectedQuestion(null)}>
-                    <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
-                        <div className="p-6 border-b flex justify-between items-start">
-                            <div>
-                                <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded mb-2">
-                                    {selectedQuestion.category}
-                                </span>
-                                <h3 className="text-lg font-bold text-black">문항 상세 정보</h3>
-                            </div>
-                            <button onClick={() => setSelectedQuestion(null)} className="text-slate-400 hover:text-black">
-                                <Plus size={24} className="rotate-45" />
-                            </button>
-                        </div>
-                        <div className="p-6 max-h-[70vh] overflow-y-auto">
-                            <div className="space-y-6">
+            {
+                selectedQuestion && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-[100] p-4" onClick={() => setSelectedQuestion(null)}>
+                        <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden" onClick={e => e.stopPropagation()}>
+                            <div className="p-6 border-b flex justify-between items-start">
                                 <div>
-                                    <h4 className="text-sm font-bold text-slate-500 mb-2">질문 내용</h4>
-                                    <p className="text-black font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
-                                        {selectedQuestion.content}
-                                    </p>
+                                    <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-bold rounded mb-2">
+                                        {selectedQuestion.category}
+                                    </span>
+                                    <h3 className="text-lg font-bold text-black">문항 상세 정보</h3>
                                 </div>
-                                {selectedQuestion.image_url && (
-                                    <div>
-                                        <h4 className="text-sm font-bold text-slate-500 mb-2">이미지</h4>
-                                        <img src={selectedQuestion.image_url} alt="Problem" className="rounded-xl border border-slate-200 max-h-60 object-contain" />
-                                    </div>
-                                )}
+                                <button onClick={() => setSelectedQuestion(null)} className="text-slate-400 hover:text-black">
+                                    <Plus size={24} className="rotate-45" />
+                                </button>
                             </div>
-                        </div>
-                        <div className="p-4 border-t bg-slate-50 flex justify-end">
-                            <button
-                                onClick={() => setSelectedQuestion(null)}
-                                className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-100"
-                            >
-                                닫기
-                            </button>
+                            <div className="p-6 max-h-[70vh] overflow-y-auto">
+                                <div className="space-y-6">
+                                    <div>
+                                        <h4 className="text-sm font-bold text-slate-500 mb-2">질문 내용</h4>
+                                        <p className="text-black font-medium leading-relaxed bg-slate-50 p-4 rounded-xl border border-slate-100">
+                                            {selectedQuestion.content}
+                                        </p>
+                                    </div>
+                                    {selectedQuestion.image_url && (
+                                        <div>
+                                            <h4 className="text-sm font-bold text-slate-500 mb-2">이미지</h4>
+                                            <img src={selectedQuestion.image_url} alt="Problem" className="rounded-xl border border-slate-200 max-h-60 object-contain" />
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="p-4 border-t bg-slate-50 flex justify-end">
+                                <button
+                                    onClick={() => setSelectedQuestion(null)}
+                                    className="px-4 py-2 bg-white border border-slate-200 text-slate-700 font-bold rounded-lg hover:bg-slate-100"
+                                >
+                                    닫기
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
+                )
+            }
+        </div >
     );
 }

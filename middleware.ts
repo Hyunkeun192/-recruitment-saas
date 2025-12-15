@@ -58,6 +58,16 @@ export async function middleware(req: NextRequest) {
   // 1. Session Refresh & Auth Check
   const { data: { session } } = await supabase.auth.getSession();
 
+  // 1.5.1 Candidate Authentication Guard
+  if (req.nextUrl.pathname.startsWith('/candidate')) {
+    if (!session) {
+      const redirectUrl = req.nextUrl.clone();
+      redirectUrl.pathname = '/login';
+      redirectUrl.searchParams.set('next', req.nextUrl.pathname);
+      return NextResponse.redirect(redirectUrl);
+    }
+  }
+
   // 1.5 Admin Authentication Guard
   if (req.nextUrl.pathname.startsWith('/admin') && !req.nextUrl.pathname.startsWith('/admin/login')) {
     if (!session) {
@@ -111,5 +121,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/evaluator/:path*', '/jobs/:id/apply'],
+  matcher: ['/admin/:path*', '/evaluator/:path*', '/jobs/:id/apply', '/candidate/:path*'],
 };

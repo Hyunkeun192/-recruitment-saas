@@ -242,16 +242,16 @@ export default function PersonalityScoringManagement() {
                                 <p>T = 50 + 10 × ( (원점수 - 평균) / 표준편차 )</p>
                             </div>
 
-                            {/* Section 1: Total & Categories */}
+                            {/* Section 1: Total */}
                             <div>
-                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">척도 및 종합</h3>
+                                <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-3">종합 점수</h3>
                                 <div className="grid grid-cols-1 gap-4">
-                                    {norms.filter(n => n.category_name === 'TOTAL' || categories.includes(n.category_name)).map(norm =>
+                                    {norms.filter(n => n.category_name === 'TOTAL').map(norm =>
                                         renderNormRow(
                                             norm,
-                                            norm.category_name === 'TOTAL' ? '종합 (전체)' : norm.category_name,
-                                            norm.category_name === 'TOTAL' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600',
-                                            norm.category_name === 'TOTAL' ? '모든 척도의 원점수 합계 기준' : '성격 척도'
+                                            '종합 (전체)',
+                                            'bg-slate-800 text-white',
+                                            '모든 척도의 원점수 합계 기준'
                                         )
                                     )}
                                 </div>
@@ -275,6 +275,21 @@ export default function PersonalityScoringManagement() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Section 3: Categories (Scales) */}
+                            <div>
+                                <h3 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-3">성격 척도</h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {norms.filter(n => categories.includes(n.category_name)).map(norm =>
+                                        renderNormRow(
+                                            norm,
+                                            norm.category_name,
+                                            'bg-slate-100 text-slate-600',
+                                            '성격 척도'
+                                        )
+                                    )}
+                                </div>
+                            </div>
 
                         </div>
                     )}

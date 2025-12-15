@@ -18,6 +18,7 @@ export const metadata: Metadata = {
 };
 
 import QueryProvider from "@/lib/providers/query-provider";
+import { Toaster } from "sonner";
 
 export default function RootLayout({
   children,
@@ -31,6 +32,7 @@ export default function RootLayout({
       >
         <QueryProvider>
           {children}
+          <Toaster richColors position="top-center" />
         </QueryProvider>
       </body>
     </html>
