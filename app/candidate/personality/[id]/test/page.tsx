@@ -48,7 +48,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
         };
 
         try {
-            await supabase.from('test_results').update(payload).eq('id', rId);
+            // Fix: Cast payload to any to avoid typescript 'never' error
+            await supabase.from('test_results').update(payload as any).eq('id', rId);
         } catch (e) {
             console.error('Save failed', e);
         }
@@ -63,6 +64,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
             saveProgress(true);
+            const confirmationMessage = '검사를 중단하시겠습니까?';
             e.preventDefault();
             e.returnValue = '';
         };
@@ -131,7 +133,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 .single();
 
             if (tError) throw tError;
-            if (testData.time_limit) setTimeLimitMinutes(testData.time_limit);
+            // Fix: Cast testData to any
+            if ((testData as any).time_limit) setTimeLimitMinutes((testData as any).time_limit);
 
             // B. Fetch Questions
             const { data: relations, error: rError } = await supabase
@@ -160,20 +163,22 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             let finalQuestions = [];
 
             if (existingResult) {
-                setResultId(existingResult.id);
-                setElapsedSeconds(existingResult.elapsed_seconds || 0);
-                setCurrentIndex(existingResult.current_index || 0);
+                // Fix: Cast existingResult to any
+                const res = existingResult as any;
+                setResultId(res.id);
+                setElapsedSeconds(res.elapsed_seconds || 0);
+                setCurrentIndex(res.current_index || 0);
 
-                if (existingResult.answers_log) {
+                if (res.answers_log) {
                     const restoredAnswers: Record<number, number> = {};
-                    Object.entries(existingResult.answers_log).forEach(([k, v]) => {
+                    Object.entries(res.answers_log).forEach(([k, v]) => {
                         restoredAnswers[parseInt(k)] = v as number;
                     });
                     setAnswers(restoredAnswers);
                 }
 
-                if (existingResult.questions_order && Array.isArray(existingResult.questions_order)) {
-                    const orderMap = new Map(existingResult.questions_order.map((id: string, idx: number) => [id, idx]));
+                if (res.questions_order && Array.isArray(res.questions_order)) {
+                    const orderMap = new Map(res.questions_order.map((id: string, idx: number) => [id, idx]));
                     finalQuestions = allQuestionsRaw.sort((a: any, b: any) => {
                         const idxA = orderMap.get(a.id) ?? 9999;
                         const idxB = orderMap.get(b.id) ?? 9999;
@@ -195,12 +200,12 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                         current_index: 0,
                         answers_log: {},
                         started_at: new Date().toISOString()
-                    })
+                    } as any) // Fix: Cast insert payload
                     .select()
                     .single();
 
                 if (createError) throw createError;
-                setResultId(newResult.id);
+                setResultId((newResult as any).id); // Fix: Cast result
             }
 
             setQuestions(finalQuestions);
@@ -242,11 +247,12 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
             // Force save with latest data
             if (resultId) {
+                // Fix: Cast payload
                 supabase.from('test_results').update({
                     current_index: nextIdx,
                     answers_log: answers,
                     updated_at: new Date().toISOString()
-                }).eq('id', resultId).then();
+                } as any).eq('id', resultId).then();
             }
         }
     };
@@ -288,8 +294,9 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 .eq('test_id', testId)
                 .single();
 
-            if (normData && normData.std_dev_value > 0) {
-                const zScore = (totalScore - normData.mean_value) / normData.std_dev_value;
+            // Fix: Cast normData
+            if (normData && (normData as any).std_dev_value > 0) {
+                const zScore = (totalScore - (normData as any).mean_value) / (normData as any).std_dev_value;
                 tScore = Math.round((zScore * 10 + 50) * 100) / 100; // Round to 2 decimal places
             }
 
@@ -303,7 +310,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     status: 'COMPLETED',
                     total_score: totalScore,
                     t_score: tScore
-                })
+                } as any) // Fix: Cast payload
                 .eq('id', resultId);
 
             toast.success('검사가 완료되었습니다.');
@@ -452,11 +459,12 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                                                                     // Manual save with new index and new answer
                                                                     if (resultId) {
                                                                         const updatedAnswers = { ...answers, [currentIndex]: score };
+                                                                        // Fix: Cast payload
                                                                         supabase.from('test_results').update({
                                                                             current_index: nextIdx,
                                                                             answers_log: updatedAnswers,
                                                                             updated_at: new Date().toISOString()
-                                                                        }).eq('id', resultId).then();
+                                                                        } as any).eq('id', resultId).then();
                                                                     }
                                                                 }, 250);
                                                             }
