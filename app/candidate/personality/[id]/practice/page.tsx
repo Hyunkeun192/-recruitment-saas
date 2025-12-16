@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState, use } from "react";
-import { ArrowRight, ArrowLeft, Check } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, ArrowRight as ArrowRightIcon } from "lucide-react"; // ArrowRightIcon alias if needed
 
 // 연습문제 데이터 (3문항)
 const PRACTICE_QUESTIONS = [
@@ -24,7 +24,7 @@ const PRACTICE_QUESTIONS = [
 ];
 
 export default function PersonalityPracticePage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params);
+    const { id: testId } = use(params);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, number>>({});
 
@@ -33,11 +33,16 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
 
         // Pass to next slide (even if it's the last question, go to completion card)
         if (currentIndex < PRACTICE_QUESTIONS.length) {
-            setTimeout(() => setCurrentIndex(prev => prev + 1), 300);
+            setTimeout(() => setCurrentIndex(prev => prev + 1), 250); // 250ms delay like the main test
         }
     };
 
     const nextQuestion = () => {
+        // Allow moving to completion card even if not answered? Usually practice allows it or blocks it.
+        // Let's block if not answered, similar to test logic, or just allow for practice ease.
+        // The original code allowed free navigation. Let's stick to free nav or simple check.
+        // Let's allow free nav for practice but maybe show toast if desired.
+        // For now, simple nav.
         if (currentIndex < PRACTICE_QUESTIONS.length) {
             setCurrentIndex(prev => prev + 1);
         }
@@ -49,46 +54,65 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
         }
     };
 
+    // Calculate progress for the bar
+    // Index 0 -> 1/3 (33%), Index 1 -> 2/3 (66%), Index 2 -> 3/3 (100%)
+    // But we have a completion card at index 3.
+    // Let's make the bar filled when index == length.
+    const progressPercent = PRACTICE_QUESTIONS.length > 0
+        ? (Math.min(currentIndex + 1, PRACTICE_QUESTIONS.length) / PRACTICE_QUESTIONS.length) * 100
+        : 0;
+
     return (
-        <div className="w-full py-10 overflow-hidden min-h-screen flex flex-col">
+        <div className="w-full py-10 overflow-hidden min-h-screen flex flex-col select-none">
             {/* Header */}
             <div className="max-w-4xl mx-auto w-full px-6 mb-8 flex items-center justify-between shrink-0">
-                <Link href={`/candidate/personality/${id}/guide`} className="text-slate-500 hover:text-slate-900 flex items-center gap-2 transition-colors">
+                <Link href={`/candidate/personality/${testId}/guide`} className="flex items-center gap-2 text-slate-500 hover:text-slate-900 transition-colors">
                     <ArrowLeft size={20} />
                     <span className="font-medium">유의사항으로</span>
                 </Link>
-                <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                        {PRACTICE_QUESTIONS.map((_, idx) => (
-                            <div
-                                key={idx}
-                                className={`h-2 rounded-full transition-all duration-300 ${
-                                    // If we are on completion card (index == length), all should be filled? Or just keep last active?
-                                    // Let's make all active if completed
-                                    (idx === currentIndex || (currentIndex === PRACTICE_QUESTIONS.length && idx === PRACTICE_QUESTIONS.length - 1))
-                                        ? 'w-8 bg-blue-600'
-                                        : (idx < currentIndex ? 'w-2 bg-blue-600' : 'w-2 bg-slate-200')
-                                    }`}
-                            />
-                        ))}
-                    </div>
-                </div>
+
+                {/* Question Count Badge */}
                 <div className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
                     연습문제 {Math.min(currentIndex + 1, PRACTICE_QUESTIONS.length)}/{PRACTICE_QUESTIONS.length}
+                </div>
+            </div>
+
+            {/* Progress Bar with Animation */}
+            <div className="max-w-4xl mx-auto w-full px-6 mb-8">
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full relative">
+                    <div
+                        className="h-full bg-blue-600 transition-all duration-1000 ease-[cubic-bezier(0.4,0,0.2,1)] relative overflow-hidden"
+                        style={{ width: `${progressPercent}%` }}
+                    >
+                        {/* Shimmer Overlay */}
+                        <div className="absolute top-0 left-0 bottom-0 right-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer" />
+                    </div>
                 </div>
             </div>
 
             {/* Carousel Container */}
             <div className="flex-1 relative flex flex-col justify-center">
                 <div
-                    className="flex transition-transform duration-500 ease-in-out [--gap:24px] [--card-width:80vw] md:[--card-width:50vw]"
+                    className="flex transition-transform duration-500 ease-in-out [--gap:24px] [--card-width:80vw] md:[--card-width:600px]"
                     style={{
-                        transform: `translateX(calc(50vw - (var(--card-width) / 2) - (${currentIndex} * (var(--card-width) + var(--gap)))))`
+                        transform: `translateX(calc(50% - ((var(--card-width) - var(--gap)) / 2) - (${currentIndex} * var(--card-width))))`
                     }}
                 >
                     {PRACTICE_QUESTIONS.map((q, idx) => {
                         const isCurrent = idx === currentIndex;
-                        const isAnswered = answers[idx] !== undefined;
+                        // Optimization: render items close to current index
+                        const shouldRender = Math.abs(currentIndex - idx) <= 2;
+
+                        if (!shouldRender) {
+                            return (
+                                <div
+                                    key={q.id}
+                                    className="shrink-0 pr-[24px]"
+                                    style={{ width: 'var(--card-width)' }}
+                                    aria-hidden="true"
+                                />
+                            );
+                        }
 
                         return (
                             <div
@@ -100,7 +124,7 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
                                     w-full h-full bg-white rounded-3xl border shadow-xl p-8 md:p-12 transition-all duration-500
                                     ${isCurrent ? 'opacity-100 scale-100 border-slate-200 shadow-slate-200/50' : 'opacity-40 scale-95 border-slate-100 blur-[1px]'}
                                 `}>
-                                    <h2 className="text-2xl md:text-3xl font-bold mb-10 leading-relaxed text-center whitespace-pre-line text-slate-800">
+                                    <h2 className="text-2xl md:text-3xl font-bold mb-10 leading-relaxed text-center whitespace-pre-line text-slate-800 break-keep">
                                         {q.question}
                                     </h2>
 
@@ -118,12 +142,12 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
                                                         w-full p-4 rounded-xl text-left transition-all duration-200 border-2 flex items-center justify-between group
                                                         ${isSelected
                                                             ? 'border-blue-600 bg-blue-50 text-blue-700 font-bold shadow-md'
-                                                            : 'border-slate-100 text-slate-500 hover:border-blue-200 hover:bg-slate-50'
+                                                            : 'border-slate-100 text-slate-900 hover:border-blue-200 hover:bg-slate-50'
                                                         }
                                                         ${!isCurrent ? 'cursor-default' : 'cursor-pointer'}
                                                     `}
                                                 >
-                                                    <span>{option}</span>
+                                                    <span className="text-slate-900 font-medium text-lg">{option}</span>
                                                     {isSelected && (
                                                         <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center animate-in zoom-in">
                                                             <Check size={14} className="text-white bg-blue-600" />
@@ -159,7 +183,7 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
                             </p>
 
                             <Link
-                                href={`/candidate/personality/${id}/test`}
+                                href={`/candidate/personality/${testId}/test`}
                                 className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 shadow-lg shadow-blue-200/50 text-lg group"
                             >
                                 실전 검사 시작하기 <ArrowRight size={20} className="group-hover:translate-x-1 transition-transform" />
@@ -198,7 +222,7 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
             {/* Bottom Action Area */}
             <div className="h-24 sticky bottom-0 flex items-center justify-center shrink-0">
                 {currentIndex < PRACTICE_QUESTIONS.length && (
-                    <p className="text-slate-400 text-sm font-medium animate-pulse">
+                    <p className="text-slate-400 text-sm font-medium">
                         답변을 선택하면 다음 문항으로 넘어갑니다
                     </p>
                 )}

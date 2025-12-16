@@ -91,6 +91,11 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
         };
 
         const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+            // [MODIFIED] 로그아웃 진행 중이면 경고 팝업 스킵
+            if (sessionStorage.getItem('is_logout_process') === 'true') {
+                return;
+            }
+
             saveProgress(true);
             const confirmationMessage = '검사를 중단하시겠습니까?';
             e.preventDefault();
@@ -111,6 +116,11 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
     // 2. Initial Fetch
     useEffect(() => {
+        // [MODIFIED] 진입 시 로그아웃 플래그 초기화
+        if (typeof window !== 'undefined') {
+            sessionStorage.removeItem('is_logout_process');
+        }
+
         initializeTest();
         return () => stopTimer();
     }, [testId]);
@@ -225,13 +235,9 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     finalQuestions = allQuestionsRaw;
                 }
 
-                // Check practice skip logic locally to prepare correct index
-                const firstRealQuestionIndex = finalQuestions.findIndex((q: any) => !q.is_practice);
+                // [MODIFIED] 연습문제 스킵 로직 제거: 재진입 시에도 연습문제 구간이면 연습문제부터 시작
+                // 기존 강제 스킵 로직을 제거하여 연습문제(is_practice=true)가 있으면 그곳부터 시작하도록 함
 
-                if (firstRealQuestionIndex !== -1 && (res.current_index || 0) < firstRealQuestionIndex) {
-                    // Practice pending, prepare data to skip practice
-                    res.current_index = firstRealQuestionIndex;
-                }
 
                 // Store data and show dialog instead of applying immediately
                 setPendingResultData(res);
@@ -313,22 +319,36 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             // Start fresh: Delete existing result to force new shuffle and new start
             if (pendingResultData?.id) {
                 const { error: delError } = await supabase.from('test_results').delete().eq('id', pendingResultData.id);
+
                 if (delError) {
-                    console.error("Delete failed:", delError);
-                    toast.error(`초기화 실패 (권한 부족): ${delError.message}`);
-                    return; // Stop here if we can't delete
+                    console.error("Delete failed, attempting soft reset:", delError);
+
+                    // Fallback: Update (Reset) instead of Delete
+                    const { error: resetError } = await (supabase.from('test_results') as any)
+                        .update({
+                            current_index: 0,
+                            answers_log: {},
+                            elapsed_seconds: 0,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', pendingResultData.id);
+
+                    if (resetError) {
+                        toast.error(`초기화 실패: ${resetError.message}`);
+                        return;
+                    }
+
+                    // Soft reset success: Redirect to practice page
+                    router.push(`/candidate/personality/${testId}/practice`);
+                    return;
                 }
             }
 
-            // Re-initialize to generate new order and start over
-            setResultId(null);
-            setElapsedSeconds(0);
-            setCurrentIndex(0);
-            setAnswers({});
-            setPendingResultData(null);
+            // Delete Success: Redirect to practice page
+            router.push(`/candidate/personality/${testId}/practice`);
 
-            // Re-fetch/Re-init
-            initializeTest();
+            // No need to re-init here as we are leaving
+
         }
     };
 
@@ -508,12 +528,16 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 </div>
             </div>
 
+            {/* Progress Bar with Animation */}
             <div className="max-w-4xl mx-auto w-full px-6 mb-8">
-                <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full">
+                <div className="h-2 bg-slate-100 rounded-full overflow-hidden w-full relative">
                     <div
-                        className="h-full bg-blue-600 transition-all duration-300 ease-out"
+                        className="h-full bg-blue-600 transition-all duration-1000 ease-[cubic-bezier(0.4,0,0.2,1)] relative overflow-hidden"
                         style={{ width: `${progressPercent}%` }}
-                    />
+                    >
+                        {/* Shimmer Overlay */}
+                        <div className="absolute top-0 left-0 bottom-0 right-0 w-full h-full bg-gradient-to-r from-transparent via-white/40 to-transparent -translate-x-full animate-shimmer" />
+                    </div>
                 </div>
             </div>
 

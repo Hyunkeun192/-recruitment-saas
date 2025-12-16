@@ -20,6 +20,12 @@ export default function Home() {
           <div className="font-bold text-2xl tracking-tighter">U.men.</div>
           <div className="flex gap-4">
             <Link
+              href="/login?next=%2Fcandidate%2Fpersonality"
+              className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+            >
+              Candidate Log-in
+            </Link>
+            <Link
               href="/admin/login"
               className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
             >
