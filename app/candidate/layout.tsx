@@ -25,7 +25,7 @@ export default function CandidateLayout({
             <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link href="/candidate/dashboard" className="font-bold text-xl tracking-tighter hover:text-blue-600 transition-colors">
-                        Fit-Log. <span className="text-xs font-normal text-slate-400 ml-1">Candidate</span>
+                        U.men. <span className="text-xs font-normal text-slate-400 ml-1">Candidate</span>
                     </Link>
 
                     <div className="flex items-center gap-4">

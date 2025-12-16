@@ -6,6 +6,15 @@ import { ArrowLeft, ArrowRight, Check, Clock, AlertTriangle } from "lucide-react
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 
 export default function PersonalityTestPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: testId } = use(params);
@@ -16,6 +25,10 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [answers, setAnswers] = useState<Record<number, number>>({});
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // Resume Dialog State
+    const [showResumeDialog, setShowResumeDialog] = useState(false);
+    const [pendingResultData, setPendingResultData] = useState<any>(null);
 
     // Resume & Timer State
     const [resultId, setResultId] = useState<string | null>(null);
@@ -38,7 +51,10 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
     // Save Progress Function (Reads from Refs)
     const saveProgress = useCallback(async (isUrgent = false) => {
         const rId = resultIdRef.current;
-        if (!rId) return;
+        if (!rId) {
+            console.log("Skipping save: No resultId");
+            return;
+        }
 
         const payload = {
             elapsed_seconds: elapsedSecondsRef.current,
@@ -47,9 +63,21 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             updated_at: new Date().toISOString()
         };
 
+        console.log("Saving progress...", payload);
+
         try {
             // Fix: Cast payload to any to avoid typescript 'never' error
-            await (supabase.from('test_results') as any).update(payload).eq('id', rId);
+            const { error, count } = await (supabase.from('test_results') as any)
+                .update(payload)
+                .eq('id', rId)
+                .select(); // Select to verify return
+
+            if (error) {
+                console.error("Save error:", error);
+                toast.error(`저장 실패: ${error.message}`);
+            } else {
+                console.log("Save success");
+            }
         } catch (e) {
             console.error('Save failed', e);
         }
@@ -76,6 +104,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
         return () => {
             window.removeEventListener('popstate', handlePopState);
             window.removeEventListener('beforeunload', handleBeforeUnload);
+            // Ensure save on unmount (e.g. navigation away/logout)
+            saveProgress(true);
         };
     }, [saveProgress]);
 
@@ -87,13 +117,13 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
     // 3. Timer Logic
     useEffect(() => {
-        if (!loading && !isSubmitting) {
+        if (!loading && !isSubmitting && !showResumeDialog) {
             startTimer();
         } else {
             stopTimer();
         }
         return () => stopTimer();
-    }, [loading, isSubmitting]);
+    }, [loading, isSubmitting, showResumeDialog]);
 
     const startTimer = () => {
         if (timerRef.current) return;
@@ -139,15 +169,23 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             // B. Fetch Questions
             const { data: relations, error: rError } = await supabase
                 .from('test_questions')
-                .select('question_id, questions(*)')
-                .eq('test_id', testId);
+                .select('question_id, is_practice, questions(*)')
+                .eq('test_id', testId)
+                .order('order_index', { ascending: true });
 
             if (rError) throw rError;
             if (!relations || relations.length === 0) {
                 toast.error('검사 문항이 없습니다.');
                 return;
             }
-            const allQuestionsRaw = relations.map((r: any) => r.questions);
+            const allQuestionsRaw = relations.map((r: any) => ({
+                ...r.questions,
+                is_practice: r.is_practice // Map is_practice from joining table
+            }));
+
+            // Separate practice and real questions check
+            const practiceCheck = allQuestionsRaw.filter((q: any) => q.is_practice);
+            console.log(`[Init] Total Loaded: ${allQuestionsRaw.length}, Practice: ${practiceCheck.length}`);
 
             // C. Check Existing Result
             const { data: existingResult, error: resError } = await supabase
@@ -158,25 +196,24 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 .is('completed_at', null)
                 .maybeSingle();
 
-            if (resError) throw resError;
+            if (resError) {
+                console.error("Error fetching existing result:", resError);
+                toast.error(`이전 기록 조회 실패: ${resError.message}`);
+                throw resError;
+            }
 
             let finalQuestions = [];
+
+            console.log("Existing result:", existingResult); // DEBUG
 
             if (existingResult) {
                 // Fix: Cast existingResult to any
                 const res = existingResult as any;
-                setResultId(res.id);
-                setElapsedSeconds(res.elapsed_seconds || 0);
-                setCurrentIndex(res.current_index || 0);
 
-                if (res.answers_log) {
-                    const restoredAnswers: Record<number, number> = {};
-                    Object.entries(res.answers_log).forEach(([k, v]) => {
-                        restoredAnswers[parseInt(k)] = v as number;
-                    });
-                    setAnswers(restoredAnswers);
-                }
+                // [MODIFIED] Do not restore immediately. Pending verification via Dialog.
+                // Instead of setting state here, we prepare pendingResultData.
 
+                // Restore order if exists
                 if (res.questions_order && Array.isArray(res.questions_order)) {
                     const orderMap = new Map(res.questions_order.map((id: string, idx: number) => [id, idx]));
                     finalQuestions = allQuestionsRaw.sort((a: any, b: any) => {
@@ -187,8 +224,34 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 } else {
                     finalQuestions = allQuestionsRaw;
                 }
+
+                // Check practice skip logic locally to prepare correct index
+                const firstRealQuestionIndex = finalQuestions.findIndex((q: any) => !q.is_practice);
+
+                if (firstRealQuestionIndex !== -1 && (res.current_index || 0) < firstRealQuestionIndex) {
+                    // Practice pending, prepare data to skip practice
+                    res.current_index = firstRealQuestionIndex;
+                }
+
+                // Store data and show dialog instead of applying immediately
+                setPendingResultData(res);
+                setShowResumeDialog(true);
             } else {
-                finalQuestions = shuffleArray([...allQuestionsRaw]);
+                // Separate practice and real questions
+                const practiceQuestions = allQuestionsRaw.filter((q: any) => q.is_practice);
+                const realQuestions = allQuestionsRaw.filter((q: any) => !q.is_practice);
+
+                console.log(`Found ${practiceQuestions.length} practice questions.`); // DEBUG
+
+                // Shuffle only real questions
+                let array = [...realQuestions];
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+
+                // Combine: Practice first, then shuffled Real
+                finalQuestions = [...practiceQuestions, ...array];
 
                 const { data: newResult, error: createError } = await supabase
                     .from('test_results')
@@ -200,18 +263,19 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                         current_index: 0,
                         answers_log: {},
                         started_at: new Date().toISOString()
-                    } as any) // Fix: Cast insert payload
+                    } as any)
                     .select()
                     .single();
 
                 if (createError) throw createError;
-                setResultId((newResult as any).id); // Fix: Cast result
+                setResultId((newResult as any).id);
             }
 
             setQuestions(finalQuestions);
-        } catch (error) {
+        } catch (error: any) {
             console.error('Init failed:', error);
-            toast.error('검사를 시작할 수 없습니다. 관리자에게 문의하세요.');
+            console.log('Init error details:', JSON.stringify(error, null, 2));
+            toast.error(`검사 초기화 실패: ${error.message || JSON.stringify(error)}`);
         } finally {
             setLoading(false);
         }
@@ -227,10 +291,73 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
         return array;
     };
 
+    const handleResumeConfirm = async (shouldResume: boolean) => {
+        setShowResumeDialog(false);
+        if (shouldResume && pendingResultData) {
+            // Apply pending data
+            setResultId(pendingResultData.id);
+            setElapsedSeconds(pendingResultData.elapsed_seconds || 0);
+            setCurrentIndex(pendingResultData.current_index || 0);
+
+            if (pendingResultData.answers_log) {
+                const restoredAnswers: Record<number, number> = {};
+                Object.entries(pendingResultData.answers_log).forEach(([k, v]) => {
+                    restoredAnswers[parseInt(k)] = v as number;
+                });
+                setAnswers(restoredAnswers);
+            }
+            // Resume timer
+            startTimer();
+        } else {
+            // Start fresh: Delete existing result to force new shuffle and new start
+            // Start fresh: Delete existing result to force new shuffle and new start
+            if (pendingResultData?.id) {
+                const { error: delError } = await supabase.from('test_results').delete().eq('id', pendingResultData.id);
+                if (delError) {
+                    console.error("Delete failed:", delError);
+                    toast.error(`초기화 실패 (권한 부족): ${delError.message}`);
+                    return; // Stop here if we can't delete
+                }
+            }
+
+            // Re-initialize to generate new order and start over
+            setResultId(null);
+            setElapsedSeconds(0);
+            setCurrentIndex(0);
+            setAnswers({});
+            setPendingResultData(null);
+
+            // Re-fetch/Re-init
+            initializeTest();
+        }
+    };
+
     const handleAnswer = async (score: number) => {
         const newAnswers = { ...answers, [currentIndex]: score };
         setAnswers(newAnswers);
-        // State update will trigger ref update via effect
+
+        // Immediate save for reliability
+        if (resultId) {
+            try {
+                // Determine next index (if not last)
+                const nextIdx = currentIndex < questions.length ? currentIndex + 1 : currentIndex;
+
+                await (supabase.from('test_results') as any).update({
+                    current_index: nextIdx, // Save where they SHOULD be (next question)
+                    answers_log: newAnswers,
+                    updated_at: new Date().toISOString()
+                }).eq('id', resultId);
+            } catch (e) {
+                console.error("Save answer failed", e);
+            }
+        }
+
+        if (currentIndex < questions.length) {
+            setTimeout(() => {
+                const nextIdx = currentIndex + 1;
+                setCurrentIndex(nextIdx);
+            }, 250); // Keep UI delay for UX
+        }
     };
 
     const nextQuestion = () => {
@@ -453,23 +580,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                                                     onClick={() => {
                                                         if (isCurrent) {
                                                             handleAnswer(score);
-                                                            if (currentIndex < questions.length) {
-                                                                setTimeout(() => {
-                                                                    const nextIdx = currentIndex + 1;
-                                                                    setCurrentIndex(nextIdx);
-
-                                                                    // Manual save with new index and new answer
-                                                                    if (resultId) {
-                                                                        const updatedAnswers = { ...answers, [currentIndex]: score };
-                                                                        // Fix: Cast payload
-                                                                        (supabase.from('test_results') as any).update({
-                                                                            current_index: nextIdx,
-                                                                            answers_log: updatedAnswers,
-                                                                            updated_at: new Date().toISOString()
-                                                                        }).eq('id', resultId).then();
-                                                                    }
-                                                                }, 250);
-                                                            }
+                                                            // Navigation logic is now inside handleAnswer's timeout
                                                         }
                                                     }}
                                                     disabled={!isCurrent}
@@ -561,6 +672,26 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     </p>
                 )}
             </div>
+            {/* Resume Confirmation Dialog */}
+            <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>검사 이어하기</DialogTitle>
+                        <DialogDescription>
+                            이전에 진행하던 검사 기록이 있습니다.<br />
+                            마지막으로 풀던 문항부터 계속 진행하시겠습니까?
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => handleResumeConfirm(false)}>
+                            아니오 (처음부터)
+                        </Button>
+                        <Button onClick={() => handleResumeConfirm(true)}>
+                            네 (이어하기)
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -32,7 +32,7 @@ function LoginPageContent() {
         <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
             <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-10 text-center">
                 <h1 className="text-3xl font-bold text-slate-900 mb-2">환영합니다</h1>
-                <p className="text-slate-500 mb-10">Fit-Log와 함께 당신의 최적(Fit)을 찾아보세요.</p>
+                <p className="text-slate-500 mb-10">U.men은 당신의 행복을 기원합니다.</p>
 
                 <button
                     onClick={handleGoogleLogin}

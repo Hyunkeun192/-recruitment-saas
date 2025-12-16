@@ -17,7 +17,7 @@ export default function Home() {
       {/* Navigation */}
       <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="font-bold text-2xl tracking-tighter">Fit-Log.</div>
+          <div className="font-bold text-2xl tracking-tighter">U.men.</div>
           <div className="flex gap-4">
             <Link
               href="/admin/login"
@@ -115,10 +115,10 @@ export default function Home() {
       <footer className="w-full py-10 border-t border-slate-100">
         <div className="max-w-7xl mx-auto px-6 flex justify-between items-center">
           <div className="text-sm font-bold text-slate-400">
-            10년 차 채용 설계자의 Fit-Log
+            10년 차 채용 설계자의 U.men
           </div>
           <div className="text-xs text-slate-300">
-            © 2024 Fit-Log
+            © 2024 U.men
           </div>
         </div>
       </footer>
