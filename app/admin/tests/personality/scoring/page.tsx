@@ -226,7 +226,7 @@ export default function PersonalityScoringManagement() {
 
             const { error } = await supabase
                 .from('test_norms')
-                .upsert(newNorms, { onConflict: 'test_id, category_name' });
+                .upsert(newNorms as any, { onConflict: 'test_id, category_name' });
 
             if (error) throw error;
 
@@ -259,7 +259,7 @@ export default function PersonalityScoringManagement() {
                 version_name: newVersionName,
                 active_norms_snapshot: norms,
                 is_active: true
-            }).select().single();
+            } as any).select().single();
 
             if (error) throw error;
 
@@ -305,7 +305,7 @@ export default function PersonalityScoringManagement() {
                 version.active_norms_snapshot.map(n => ({
                     ...n,
                     test_id: selectedTestId
-                })),
+                })) as any,
                 { onConflict: 'test_id, category_name' }
             );
 
