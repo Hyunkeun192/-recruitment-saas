@@ -41,7 +41,7 @@ export default async function PersonalityTestsPage() {
             <div className="flex items-center gap-2 mb-8">
                 <Link href="/candidate/dashboard" className="text-slate-500 hover:text-slate-900 flex items-center gap-2">
                     <ArrowLeft size={20} />
-                    대시보드
+                    Home으로 돌아가기
                 </Link>
             </div>
 

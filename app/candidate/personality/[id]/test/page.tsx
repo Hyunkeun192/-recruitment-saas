@@ -42,6 +42,9 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
     const elapsedSecondsRef = useRef(elapsedSeconds);
     const resultIdRef = useRef(resultId);
 
+    // Prevent double initialization
+    const initializingRef = useRef(false);
+
     // Sync refs
     useEffect(() => { currentIndexRef.current = currentIndex; }, [currentIndex]);
     useEffect(() => { answersRef.current = answers; }, [answers]);
@@ -121,7 +124,11 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             sessionStorage.removeItem('is_logout_process');
         }
 
-        initializeTest();
+        if (!initializingRef.current) {
+            initializingRef.current = true;
+            initializeTest();
+        }
+
         return () => stopTimer();
     }, [testId]);
 
@@ -157,37 +164,53 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
     const initializeTest = async () => {
         try {
+            console.log(`[Init] Starting initialization for testId: ${testId}`);
             setLoading(true);
             const { data: { user } } = await supabase.auth.getUser();
             if (!user) {
+                console.warn('[Init] No user found, redirecting to login');
                 toast.error('로그인이 필요합니다.');
                 router.push('/login');
                 return;
             }
+            console.log(`[Init] User authenticated: ${user.id}`);
 
             // A. Fetch Test Info
+            console.log('[Init] Step A: Fetching test info...');
             const { data: testData, error: tError } = await supabase
                 .from('tests')
                 .select('time_limit')
                 .eq('id', testId)
                 .single();
 
-            if (tError) throw tError;
+            if (tError) {
+                console.error('[Init] Step A Failed:', tError);
+                throw tError;
+            }
+            console.log('[Init] Step A Success:', testData);
+
             // Fix: Cast testData to any
             if ((testData as any).time_limit) setTimeLimitMinutes((testData as any).time_limit);
 
             // B. Fetch Questions
+            console.log('[Init] Step B: Fetching questions...');
             const { data: relations, error: rError } = await supabase
                 .from('test_questions')
                 .select('question_id, is_practice, questions(*)')
                 .eq('test_id', testId)
                 .order('order_index', { ascending: true });
 
-            if (rError) throw rError;
+            if (rError) {
+                console.error('[Init] Step B Failed:', rError);
+                throw rError;
+            }
             if (!relations || relations.length === 0) {
+                console.warn('[Init] Step B: No questions found');
                 toast.error('검사 문항이 없습니다.');
                 return;
             }
+            console.log(`[Init] Step B Success: Found ${relations.length} relations`);
+
             const allQuestionsRaw = relations.map((r: any) => ({
                 ...r.questions,
                 is_practice: r.is_practice // Map is_practice from joining table
@@ -198,6 +221,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             console.log(`[Init] Total Loaded: ${allQuestionsRaw.length}, Practice: ${practiceCheck.length}`);
 
             // C. Check Existing Result
+            console.log('[Init] Step C: Checking existing result...');
             const { data: existingResult, error: resError } = await supabase
                 .from('test_results')
                 .select('id, questions_order, elapsed_seconds, answers_log, current_index')
@@ -207,14 +231,14 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 .maybeSingle();
 
             if (resError) {
-                console.error("Error fetching existing result:", resError);
+                console.error("[Init] Step C Failed (Error fetching existing result):", resError);
                 toast.error(`이전 기록 조회 실패: ${resError.message}`);
                 throw resError;
             }
 
             let finalQuestions = [];
 
-            console.log("Existing result:", existingResult); // DEBUG
+            console.log("[Init] Step C Result:", existingResult); // DEBUG
 
             if (existingResult) {
                 // Fix: Cast existingResult to any
@@ -235,14 +259,20 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     finalQuestions = allQuestionsRaw;
                 }
 
-                // [MODIFIED] 연습문제 스킵 로직 제거: 재진입 시에도 연습문제 구간이면 연습문제부터 시작
-                // 기존 강제 스킵 로직을 제거하여 연습문제(is_practice=true)가 있으면 그곳부터 시작하도록 함
+                // Check if there is actual progress
+                const hasProgress = res.current_index > 0 || (res.answers_log && Object.keys(res.answers_log).length > 0);
 
-
-                // Store data and show dialog instead of applying immediately
-                setPendingResultData(res);
-                setShowResumeDialog(true);
+                if (hasProgress) {
+                    console.log('[Init] Progress found, showing resume dialog');
+                    setPendingResultData(res);
+                    setShowResumeDialog(true);
+                } else {
+                    console.log('[Init] No progress found (fresh state), starting immediately');
+                    setResultId(res.id);
+                    // No need to set index/answers as they are 0/empty
+                }
             } else {
+                console.log('[Init] Step C: No existing result, creating new one...');
                 // Separate practice and real questions
                 const practiceQuestions = allQuestionsRaw.filter((q: any) => q.is_practice);
                 const realQuestions = allQuestionsRaw.filter((q: any) => !q.is_practice);
@@ -273,15 +303,46 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     .select()
                     .single();
 
-                if (createError) throw createError;
-                setResultId((newResult as any).id);
+                if (createError) {
+                    // Check for duplicate key error (23505) - Race condition handling
+                    if (createError.code === '23505') {
+                        console.warn('[Init] Duplicate key error (Race Condition?), retrieving existing result...');
+                        const { data: retryResult, error: retryError } = await supabase
+                            .from('test_results')
+                            .select('id, questions_order')
+                            .eq('test_id', testId)
+                            .eq('user_id', user.id)
+                            .maybeSingle();
+
+                        if (retryError || !retryResult) {
+                            console.error('[Init] Recovery failed:', retryError);
+                            throw createError; // Throw original error if recovery fails
+                        }
+
+                        console.log('[Init] Recovery success, using existing result:', (retryResult as any).id);
+                        setResultId((retryResult as any).id);
+
+                    } else {
+                        console.error('[Init] Create Result Failed:', createError);
+                        throw createError;
+                    }
+                } else {
+                    setResultId((newResult as any).id);
+                    console.log('[Init] New result created:', (newResult as any).id);
+                }
             }
 
             setQuestions(finalQuestions);
+            console.log('[Init] Initialization complete.');
         } catch (error: any) {
             console.error('Init failed:', error);
             console.log('Init error details:', JSON.stringify(error, null, 2));
-            toast.error(`검사 초기화 실패: ${error.message || JSON.stringify(error)}`);
+            console.log('Error message:', error?.message);
+            console.log('Error code:', error?.code);
+            console.log('Error details:', error?.details);
+
+            const errorMsg = error?.message || JSON.stringify(error) || '알 수 없는 오류';
+            toast.error(`검사 초기화 실패: ${errorMsg}`);
         } finally {
             setLoading(false);
         }
@@ -579,18 +640,39 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                                     w-full h-full bg-white rounded-3xl border shadow-xl p-8 md:p-12 transition-all duration-500
                                     ${isCurrent ? 'opacity-100 scale-100 border-slate-200 shadow-slate-200/50' : 'opacity-40 scale-95 border-slate-100 blur-[1px]'}
                                 `}>
-                                    <h2 className="text-2xl md:text-3xl font-bold mb-10 leading-relaxed text-center whitespace-pre-line text-slate-800 break-keep">
-                                        {q.content}
-                                    </h2>
+                                    <div className="h-[140px] flex items-center justify-center mb-10">
+                                        <h2 className="text-2xl md:text-3xl font-bold leading-relaxed text-center whitespace-pre-line text-slate-800 break-keep">
+                                            {q.content}
+                                        </h2>
+                                    </div>
 
                                     <div className="space-y-3">
                                         {rawOptions.map((option: any, optIdx: number) => {
                                             const score = optIdx + 1;
                                             const isSelected = answers[idx] === score;
 
-                                            let optionText = option;
-                                            if (typeof option === 'object' && option !== null) {
-                                                optionText = option.text || option.content || option.label || option.value || JSON.stringify(option);
+                                            let optionText = null;
+                                            // 1. If it's a string, might be JSON or plain text
+                                            if (typeof option === 'string') {
+                                                if (option.trim().startsWith('{')) {
+                                                    try {
+                                                        const parsed = JSON.parse(option);
+                                                        if (parsed && typeof parsed === 'object') {
+                                                            optionText = parsed.text || parsed.content || parsed.label || parsed.value;
+                                                        } else {
+                                                            optionText = option;
+                                                        }
+                                                    } catch (e) {
+                                                        optionText = option;
+                                                    }
+                                                } else {
+                                                    optionText = option;
+                                                }
+                                            }
+
+                                            // 2. If it's an object
+                                            else if (typeof option === 'object' && option !== null) {
+                                                optionText = option.text || option.content || option.label || option.value;
                                             }
 
                                             // Fallback to default options if text is missing or "옵션"

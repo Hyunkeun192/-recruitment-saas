@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, BrainCircuit, Timer, Ban } from "lucide-react";
 
-export default function AptitudeGuidePage({ params }: { params: { id: string } }) {
+export default async function AptitudeGuidePage({ params }: { params: Promise<{ id: string }> }) {
+    const { id } = await params;
     return (
         <div className="max-w-3xl mx-auto">
             <div className="mb-8">
@@ -15,9 +16,9 @@ export default function AptitudeGuidePage({ params }: { params: { id: string } }
 
             <div className="bg-white rounded-3xl p-8 border border-slate-200 shadow-sm space-y-8">
 
-                <div className="space-y-4">
+                <div className="space-y-16">
                     <div className="flex gap-4">
-                        <div className="w-12 h-12 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                             <BrainCircuit size={24} />
                         </div>
                         <div>
@@ -30,7 +31,7 @@ export default function AptitudeGuidePage({ params }: { params: { id: string } }
                     </div>
 
                     <div className="flex gap-4">
-                        <div className="w-12 h-12 bg-purple-100 text-purple-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                             <Timer size={24} />
                         </div>
                         <div>
@@ -43,7 +44,7 @@ export default function AptitudeGuidePage({ params }: { params: { id: string } }
                     </div>
 
                     <div className="flex gap-4">
-                        <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center flex-shrink-0">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center flex-shrink-0">
                             <Ban size={24} />
                         </div>
                         <div>
@@ -56,10 +57,10 @@ export default function AptitudeGuidePage({ params }: { params: { id: string } }
                     </div>
                 </div>
 
-                <div className="pt-8 border-t border-slate-100 flex justify-end">
+                <div className="pt-8 border-t border-slate-100 flex justify-center">
                     <Link
-                        href={`/candidate/aptitude/${params.id}/practice`}
-                        className="bg-slate-900 text-white px-8 py-4 rounded-xl font-bold hover:bg-slate-800 transition-colors flex items-center gap-2"
+                        href={`/candidate/aptitude/${id}/practice`}
+                        className="bg-blue-500 text-white px-8 py-4 rounded-xl font-bold hover:bg-blue-600 transition-colors flex items-center gap-2 shadow-lg shadow-blue-200"
                     >
                         연습문제 풀기 <ArrowRight size={20} />
                     </Link>

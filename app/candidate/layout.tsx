@@ -1,6 +1,7 @@
 'use client';
 
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
 import { LogOut, User } from "lucide-react";
@@ -55,14 +56,11 @@ export default function CandidateLayout({
             <nav className="bg-white border-b border-slate-200 sticky top-0 z-40">
                 <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                     <Link href="/" className="font-bold text-xl tracking-tighter hover:text-blue-600 transition-colors">
-                        U.men. <span className="text-xs font-normal text-slate-400 ml-1">Candidate</span>
+                        <Image src="/umen_logo.jpg" alt="U.men." width={80} height={32} className="h-6 w-auto object-contain" />
                     </Link>
 
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-2 text-sm text-slate-500 bg-slate-100 px-3 py-1.5 rounded-full">
-                            <User size={14} />
-                            <span>응시자 모드</span>
-                        </div>
+
                         <button
                             onClick={handleLogoutClick}
                             className="text-sm font-medium text-slate-500 hover:text-red-500 flex items-center gap-1 transition-colors"

@@ -1,8 +1,18 @@
 import Link from "next/link";
 import { ArrowLeft, ArrowRight, CheckCircle2, Clock, AlertCircle } from "lucide-react";
 
+import { createServerSupabaseClient } from "@/lib/supabase-server";
+
 export default async function PersonalityGuidePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
+    const supabase = await createServerSupabaseClient();
+
+    const { data: testData } = await supabase
+        .from('tests')
+        .select('time_limit')
+        .eq('id', id)
+        .single();
+
     return (
         <div className="max-w-3xl mx-auto">
             <div className="mb-8">
@@ -24,7 +34,7 @@ export default async function PersonalityGuidePage({ params }: { params: Promise
                         <div>
                             <h3 className="font-bold text-lg">제한 시간 안내</h3>
                             <p className="text-slate-600 mt-1">
-                                본 검사는 총 <strong>30분</strong> 동안 진행됩니다.<br />
+                                본 검사는 총 <strong>{testData?.time_limit || 30}분</strong> 동안 진행됩니다.<br />
                                 시간 내에 모든 문항에 응답해야 합니다.
                             </p>
                         </div>
