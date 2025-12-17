@@ -265,10 +265,10 @@ export default function PersonalityScoringManagement() {
 
             // 2. Flip others (Manual workaround for no transaction)
             if (inserted) {
-                await supabase.from('test_norm_versions')
+                await (supabase.from('test_norm_versions') as any)
                     .update({ is_active: false })
                     .eq('test_id', selectedTestId)
-                    .neq('id', inserted.id);
+                    .neq('id', (inserted as any).id);
             }
 
             toast.success(`버전 '${newVersionName}' 저장 및 활성화 완료`);
@@ -290,9 +290,9 @@ export default function PersonalityScoringManagement() {
         try {
             // 1. Update DB is_active flags
             // Set all to false first
-            await supabase.from('test_norm_versions').update({ is_active: false }).eq('test_id', selectedTestId);
+            await (supabase.from('test_norm_versions') as any).update({ is_active: false }).eq('test_id', selectedTestId);
             // Set target to true
-            await supabase.from('test_norm_versions').update({ is_active: true }).eq('id', version.id);
+            await (supabase.from('test_norm_versions') as any).update({ is_active: true }).eq('id', version.id);
 
             // 2. Restore Snapshot to test_norms (The actual logic to "Activate" the norms)
             // Note: We should first clear existing norms if needed, but upsert is fine since we calculate "All Keys" in fetchTestDetails anyway.
