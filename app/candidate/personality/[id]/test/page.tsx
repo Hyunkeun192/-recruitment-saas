@@ -289,11 +289,25 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 // Combine: Practice first, then shuffled Real
                 finalQuestions = [...practiceQuestions, ...array];
 
+                // [NEW] Get current max attempt_number to support multi-attempts
+                const { data: maxAttemptData } = await supabase
+                    .from('test_results')
+                    .select('attempt_number')
+                    .eq('test_id', testId)
+                    .eq('user_id', user.id)
+                    .order('attempt_number', { ascending: false })
+                    .limit(1)
+                    .maybeSingle();
+
+                const nextAttemptNumber = ((maxAttemptData as any)?.attempt_number || 0) + 1;
+                console.log(`[Init] Calculated next attempt_number: ${nextAttemptNumber}`);
+
                 const { data: newResult, error: createError } = await supabase
                     .from('test_results')
                     .insert({
                         test_id: testId,
                         user_id: user.id,
+                        attempt_number: nextAttemptNumber,
                         questions_order: finalQuestions.map(q => q.id),
                         elapsed_seconds: 0,
                         current_index: 0,
@@ -478,57 +492,169 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             return;
         }
 
+        if (!resultId) {
+            console.error("[Submit] Critical Error: No resultId found during submission.");
+            toast.error('제출을 위한 세션 정보를 찾을 수 없습니다. 페이지를 새로고침 해주세요.');
+            return;
+        }
+
         setIsSubmitting(true);
         stopTimer();
 
         try {
-            // 1. Calculate Total Score
-            let totalScore = 0;
+            console.log("[Submit] Starting calculation", { testId, resultId, answersCount: Object.keys(answers).length });
+
+            // 1. Fetch All Norms for this test
+            const { data: norms, error: normError } = await supabase
+                .from('test_norms')
+                .select('category_name, mean_value, std_dev_value')
+                .eq('test_id', testId);
+
+            if (normError) {
+                console.error("[Submit] Error fetching norms:", normError);
+            }
+
+            const normMap: Record<string, { mean: number; stdDev: number }> = {};
+            (norms as any)?.forEach((n: any) => {
+                normMap[n.category_name] = {
+                    mean: Number(n.mean_value),
+                    stdDev: Number(n.std_dev_value)
+                };
+            });
+
+            // 2. Fetch Actual Competency Definitions for this test
+            const { data: competencyDefs, error: compError } = await supabase
+                .from('competencies')
+                .select(`
+                    id,
+                    name,
+                    competency_scales (
+                        scale_name
+                    )
+                `)
+                .eq('test_id', testId);
+
+            if (compError) {
+                console.error("[Submit] Error fetching competencies:", compError);
+            }
+
+            // 3. Calculate Raw Scores per Category (Scale)
+            const categoryRawScores: Record<string, number> = {};
+            let totalRawScore = 0;
+
             questions.forEach((q, idx) => {
                 const answer = answers[idx];
-                if (answer) {
-                    if (q.is_reverse_scored) {
-                        totalScore += (6 - answer); // Reverse scoring for 5-point Likert (1->5, 5->1)
-                    } else {
-                        totalScore += answer;
-                    }
+                if (answer !== undefined) {
+                    const category = q.category || '기타';
+                    const score = q.is_reverse_scored ? (6 - answer) : answer;
+
+                    categoryRawScores[category] = (categoryRawScores[category] || 0) + score;
+                    totalRawScore += score;
                 }
             });
 
-            // 2. Fetch Norms & Calculate T-Score
-            let tScore: number | null = null;
-            const { data: normData } = await supabase
-                .from('test_norms')
-                .select('mean_value, std_dev_value')
-                .eq('test_id', testId)
-                .single();
+            console.log("[Submit] Raw scores calculated:", categoryRawScores);
 
-            // Fix: Cast normData
-            if (normData && (normData as any).std_dev_value > 0) {
-                const zScore = (totalScore - (normData as any).mean_value) / (normData as any).std_dev_value;
-                tScore = Math.round((zScore * 10 + 50) * 100) / 100; // Round to 2 decimal places
+            // 4. Calculate T-Scores per Scale
+            const scaleResults: Record<string, { raw: number, t_score: number }> = {};
+            Object.entries(categoryRawScores).forEach(([cat, raw]) => {
+                let tScore = 50;
+                if (normMap[cat] && normMap[cat].stdDev > 0) {
+                    const zScore = (raw - normMap[cat].mean) / normMap[cat].stdDev;
+                    tScore = Math.round((zScore * 10 + 50) * 100) / 100;
+                }
+                if (isNaN(tScore)) tScore = 50;
+                scaleResults[cat] = { raw, t_score: tScore };
+            });
+
+            // 5. Aggregate Scale T-Scores into Competency T-Scores
+            // (Average of T-scores of member scales)
+            const competencyResults: Record<string, { t_score: number }> = {};
+
+            if (competencyDefs && competencyDefs.length > 0) {
+                competencyDefs.forEach((comp: any) => {
+                    const scales = comp.competency_scales.map((cs: any) => cs.scale_name);
+                    const memberTScores = scales
+                        .map((s: string) => scaleResults[s]?.t_score)
+                        .filter((s: number | undefined) => s !== undefined);
+
+                    let avgTScore = 50;
+                    if (memberTScores.length > 0) {
+                        avgTScore = memberTScores.reduce((a: number, b: number) => a + b, 0) / memberTScores.length;
+                    }
+                    competencyResults[comp.name] = { t_score: Math.round(avgTScore * 100) / 100 };
+                });
+            } else {
+                // Fallback: If no competencies defined, use scale scores as competencies (Legacy behavior)
+                Object.entries(scaleResults).forEach(([cat, res]) => {
+                    competencyResults[cat] = { t_score: res.t_score };
+                });
             }
 
-            // 3. Save Results
-            // 3. Save Results
-            await (supabase
-                .from('test_results') as any)
-                .update({
-                    answers_log: answers,
-                    elapsed_seconds: elapsedSeconds,
-                    completed_at: new Date().toISOString(),
-                    status: 'COMPLETED',
-                    total_score: totalScore,
-                    t_score: tScore
-                }) // Fix: Cast payload
+            // 6. Calculate Final Total T-Score
+            let finalTScore = 50;
+            const totalNorm = normMap['TOTAL'] || normMap['ALL'] || normMap['total'] || null;
+            if (totalNorm && totalNorm.stdDev > 0) {
+                const zScore = (totalRawScore - totalNorm.mean) / totalNorm.stdDev;
+                finalTScore = Math.round((zScore * 10 + 50) * 100) / 100;
+            } else {
+                const tScores = Object.values(scaleResults).map(c => c.t_score);
+                if (tScores.length > 0) {
+                    finalTScore = Math.round((tScores.reduce((a, b) => a + b, 0) / tScores.length) * 100) / 100;
+                }
+            }
+
+            if (isNaN(finalTScore)) finalTScore = 50;
+
+            // 7. Build detailed_scores structure
+            const detailed_scores = {
+                competencies: competencyResults,
+                scales: scaleResults,
+                total: { t_score: finalTScore },
+                raw_total: totalRawScore
+            };
+
+            console.log("[Submit] Final scores to save:", detailed_scores);
+
+            // 8. Update Record in test_results
+            const payload = {
+                answers_log: answers,
+                elapsed_seconds: elapsedSeconds,
+                completed_at: new Date().toISOString(),
+                total_score: finalTScore,
+                t_score: finalTScore,
+                detailed_scores: detailed_scores
+            };
+
+            const { error: updateError } = await (supabase.from('test_results') as any)
+                .update(payload)
                 .eq('id', resultId);
+
+            if (updateError) {
+                console.error("[Submit] Database Update Error (Object):", updateError);
+                console.error("[Submit] Database Update Error (Stringified):", JSON.stringify(updateError));
+                throw updateError;
+            }
 
             toast.success('검사가 완료되었습니다.');
             router.push('/candidate/dashboard');
 
-        } catch (error) {
-            console.error(error);
-            toast.error('제출 중 오류가 발생했습니다.');
+        } catch (error: any) {
+            console.error("Submit error:", error);
+
+            // Extract details from error object manually in case JSON.stringify fails
+            const errDetails = {
+                message: error?.message || "No message",
+                code: error?.code,
+                details: error?.details,
+                hint: error?.hint,
+                stack: error?.stack
+            };
+
+            const errorMsg = error?.message || JSON.stringify(errDetails);
+            console.error("[Submit] Detailed breakdown:", errDetails);
+
+            toast.error(`제출 중 오류가 발생했습니다: ${errorMsg}`);
             setIsSubmitting(false);
         }
     };

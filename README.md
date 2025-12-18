@@ -11,7 +11,7 @@
 * **핵심 권한:**
     * **Tenant Onboarding:** 기업 계정 생성 및 Master 계정 발급.
     * **God Mode:** 특정 기업 담당자로 로그인하여 문제 해결 (Impersonation).
-    * **Global Asset:** 전사 공통 문제은행(Global Question Bank) 관리.
+    * **Global Asset:** 전사 공통 문제은행(인성/적성 Global Question Bank) 관리 및 규준(Norms) 버전 관리.
     * **Security:** 보안 관제 및 서비스 강제 종료(Kill Switch).
 
 ### B. Corporate Admin (Client HR)
@@ -35,7 +35,8 @@
 * **정의:** 입사 지원자.
 * **핵심 기능:**
     * 지원서 작성/수정 및 철회(Withdraw).
-    * 온라인 필기시험 응시 (Fail-Safe 적용).
+    * 온라인 필기시험 응시 (인성검사/적성검사, Fail-Safe 적용).
+    * 응시 가이드 확인 및 연습 문제 풀이.
     * 마이페이지에서 전형 결과 및 배지 확인.
 
 ## 3. Database Schema (PostgreSQL)
@@ -104,9 +105,11 @@ AI 에이전트는 반드시 아래의 기술 스택을 사용하여 코드를 �
 * **Database & Auth:** Supabase (SQL 스키마와 일치하는 Supabase Client 사용)
 * **Data Fetching:** TanStack Query (React Query) - 서버 데이터 캐싱 및 로딩 상태 관리 / Server Actions (Mutation)
 
-## 6. Coding Rules for AI (AI 작업 수칙)
+6.  **Language and Reporting (언어 및 보고 규칙):**
+    *   **Korean First:** 모든 태스크(task.md), 구현 계획(implementation_plan.md), 워크쓰루(walkthrough.md) 보고서 및 사용자 통지는 반드시 **한국어**로 작성해야 함.
+    *   **Clarity:** 기술적인 용어는 영문을 병기할 수 있으나, 주요 설명과 진행 상황은 한국어로 명확하게 전달할 것.
 
-1.  **"Think in Components":** 코드를 작성할 때 하나의 파일에 몰아넣지 말고, 재사용 가능한 컴포넌트(예: `<CandidateCard />`, `<ScoreInput />`)로 분리할 것.
-2.  **Strict Type Checking:** `any` 타입 사용을 지양하고, DB 스키마(`full-schema_init.sql`)에 정의된 타입과 인터페이스를 정확히 맞출 것.
-3.  **Mock Data First:** 백엔드 API가 아직 연결되지 않았을 때는, UI 확인을 위해 **가짜 데이터(Mock Data)**를 사용하여 화면이 먼저 렌더링되게 할 것.
-4.  **Error Handling:** 모든 비동기 요청(API 호출)에는 `try-catch` 구문을 사용하고, 사용자에게 에러 상황을 Toast 메시지 등으로 알릴 것.
+7.  **Error Handling:** 모든 비동기 요청(API 호출)에는 `try-catch` 구문을 사용하고, 사용자에게 에러 상황을 Toast 메시지 등으로 알릴 것.
+8.  **AI Verification Rule (AI 검증 수칙):**
+    *   **No Browser Verification:** 브라우저를 통한 AI 모드 자동 검증(`browser_subagent`)은 수행하지 말 것. 이는 불필요한 시간을 소모함.
+    *   **User Verification:** 모든 기능 검증은 사용자가 직접 브라우저에서 수행하므로, AI는 코드 구현과 데이터 정합성 확인에 집중할 것.
