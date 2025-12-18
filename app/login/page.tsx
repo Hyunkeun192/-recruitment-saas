@@ -11,7 +11,8 @@ function LoginPageContent() {
     const supabase = createClient();
     const router = useRouter();
     const searchParams = useSearchParams();
-    const next = searchParams.get('next') || '/candidate/dashboard';
+    // Force redirect to home with loggedin flag as per user request
+    const next = '/?loggedin=true';
 
     const handleGoogleLogin = async () => {
         try {

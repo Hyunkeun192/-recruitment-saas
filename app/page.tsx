@@ -1,38 +1,33 @@
 'use client';
 
+import LandingHeader from "@/components/layout/LandingHeader";
 import Link from "next/link";
 import { MessageSquare, Scale, BrainCircuit, Link as LinkIcon, ArrowRight } from "lucide-react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useEffect, Suspense } from "react";
+import { toast } from "sonner";
 
-/**
- * 메인 랜딩 페이지 컴포넌트
- * Concept: Clean, Minimalist, Gen Z Target
- * Styles: Bento Grid, Pastel Accents
- * Update: Hero section text removed, image enlarged.
- */
-export default function Home() {
+function HomePageContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (searchParams.get('loggedin') === 'true') {
+      toast.success('로그인되었습니다 :)', {
+        duration: 3000,
+        className: 'font-bold text-lg',
+      });
+      // Clean up the URL
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, [searchParams]);
+
   return (
     <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#B3E5FC] selection:text-slate-900">
 
       {/* Navigation */}
-      <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="font-bold text-2xl tracking-tighter">U.men.</div>
-          <div className="flex gap-4">
-            <Link
-              href="/login?next=%2Fcandidate%2Fpersonality"
-              className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
-            >
-              Enter U.
-            </Link>
-            <Link
-              href="/admin/login"
-              className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-            >
-              Enter for Admin
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <LandingHeader />
 
       <main className="max-w-7xl mx-auto px-6 pt-32 pb-24">
 
@@ -134,5 +129,13 @@ export default function Home() {
       </div>
 
     </div>
+  );
+}
+
+export default function Home() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-white" />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

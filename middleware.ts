@@ -55,8 +55,18 @@ export async function middleware(req: NextRequest) {
     }
   );
 
+
   // 1. Session Refresh & Auth Check
-  const { data: { session } } = await supabase.auth.getSession();
+  let session = null;
+  try {
+    const { data } = await supabase.auth.getSession();
+    session = data.session;
+  } catch (error) {
+    console.error('Middleware: Session validation error:', error);
+    // If refresh token is invalid, we treat it as no session (null)
+    // The subsequent checks will redirect to login if needed.
+  }
+
 
   // 1.5.1 Candidate Authentication Guard
   if (req.nextUrl.pathname.startsWith('/candidate')) {

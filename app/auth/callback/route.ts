@@ -23,6 +23,9 @@ export async function GET(request: Request) {
             }
 
             return NextResponse.redirect(redirectUrl);
+        } else {
+            console.error('Auth Callback Error:', error);
+            return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(error.message)}`);
         }
     }
 

@@ -1,0 +1,57 @@
+'use client';
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+import { User } from "@supabase/supabase-js";
+
+export default function LandingHeader() {
+    const [user, setUser] = useState<User | null>(null);
+    const supabase = createClient();
+
+    useEffect(() => {
+        const checkUser = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            setUser(session?.user ?? null);
+        };
+
+        checkUser();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+            setUser(session?.user ?? null);
+        });
+
+        return () => subscription.unsubscribe();
+    }, []);
+
+    return (
+        <nav className="fixed w-full z-50 bg-white/80 backdrop-blur-md">
+            <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+                <div className="font-bold text-2xl tracking-tighter">U.men.</div>
+                <div className="flex gap-4 items-center">
+                    {user ? (
+                        <Link
+                            href="/candidate/dashboard"
+                            className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 px-4 py-2 rounded-full"
+                        >
+                            My Value Report
+                        </Link>
+                    ) : (
+                        <Link
+                            href="/login?next=/?loggedin=true"
+                            className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                        >
+                            Enter U.
+                        </Link>
+                    )}
+                    <Link
+                        href="/admin/login"
+                        className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                    >
+                        Enter for Admin
+                    </Link>
+                </div>
+            </div>
+        </nav>
+    );
+}

@@ -1,7 +1,8 @@
 'use client';
 
+
 import Link from 'next/link';
-import { Calendar, TrendingUp, ChevronRight, Activity } from 'lucide-react';
+import { Calendar, TrendingUp, TrendingDown, ChevronRight, Activity } from 'lucide-react';
 
 interface Attempt {
     id: string;
@@ -22,6 +23,13 @@ export default function HistoryNavigator({
     if (attempts.length === 0) return null;
 
     const isFirstAttempt = attempts.length === 1;
+
+    // Statistics Calculation
+    const scores = attempts.map(a => a.score);
+    const growth = attempts.length > 1 ? attempts[attempts.length - 1].score - attempts[0].score : 0;
+    const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+    const minScore = Math.min(...scores);
+    const maxScore = Math.max(...scores);
 
     return (
         <div className="px-4">
@@ -80,16 +88,25 @@ export default function HistoryNavigator({
                                 {!isFirstAttempt && (
                                     <div className="flex items-center justify-between">
                                         <div className="text-sm font-bold text-slate-600">성장폭</div>
-                                        <div className={`text-lg font-black flex items-center gap-1 ${attempts[attempts.length - 1].score > attempts[0].score ? 'text-green-500' : 'text-amber-500'}`}>
-                                            <TrendingUp size={18} />
-                                            {(attempts[attempts.length - 1].score - attempts[0].score).toFixed(1)}
+                                        <div className={`text-lg font-black flex items-center gap-1 ${growth > 0 ? 'text-green-500' : growth < 0 ? 'text-amber-500' : 'text-slate-500'}`}>
+                                            {growth > 0 && <TrendingUp size={18} />}
+                                            {growth < 0 && <TrendingDown size={18} />}
+                                            {growth.toFixed(1)}
                                         </div>
                                     </div>
                                 )}
                                 <div className="flex items-center justify-between">
                                     <div className="text-sm font-bold text-slate-600">평균 점수</div>
                                     <div className="text-lg font-black text-slate-800">
-                                        {(attempts.reduce((acc, curr) => acc + curr.score, 0) / attempts.length).toFixed(1)}
+                                        {avgScore.toFixed(1)}
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                    <div className="text-sm font-bold text-slate-600">최대 / 최소</div>
+                                    <div className="text-sm font-bold text-slate-800">
+                                        <span className="text-blue-600">{maxScore.toFixed(1)}</span>
+                                        <span className="text-slate-300 mx-1">/</span>
+                                        <span className="text-slate-500">{minScore.toFixed(1)}</span>
                                     </div>
                                 </div>
                             </div>
