@@ -29,16 +29,35 @@ function LoginPageContent() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 px-6">
-            <div className="w-full max-w-md bg-white rounded-3xl shadow-xl p-10 text-center">
-                <h1 className="text-3xl font-bold text-slate-900 mb-2">환영합니다</h1>
-                <p className="text-slate-500 mb-10">U.men은 당신의 행복을 기원합니다.</p>
+        <div className="min-h-screen flex items-center justify-center bg-white text-slate-900 font-sans selection:bg-[#B3E5FC] selection:text-slate-900 overflow-hidden relative">
+            {/* 메인 페이지와 동일한 파스텔 배경 글로우 */}
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] bg-gradient-to-br from-[#B3E5FC] via-[#E1BEE7] to-[#FFCCBC] rounded-full blur-[100px] opacity-30 -z-10"></div>
+
+            <div className="w-full max-w-md bg-white border border-slate-100 rounded-[2.5rem] p-12 text-center shadow-xl shadow-slate-200/50 relative overflow-hidden group">
+                {/* 개별 카드 글로우 포인트 */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#B3E5FC] rounded-full blur-[40px] opacity-10 group-hover:opacity-20 transition-opacity translate-x-1/2 -translate-y-1/2"></div>
+
+                {/* 로고 섹션 */}
+                <div className="mb-12">
+                    <div className="font-bold text-3xl tracking-tighter mb-2">U.men.</div>
+                    <div className="w-8 h-1 bg-gradient-to-r from-blue-400 to-purple-400 mx-auto rounded-full"></div>
+                </div>
+
+                <h1 className="text-4xl font-black tracking-tighter text-slate-700 mb-4 leading-tight">
+                    진심을 담는<br />
+                    첫 걸음
+                </h1>
+                <p className="text-slate-500 font-medium mb-12">
+                    당신만의 고유한 빛을 발견할 수 있도록<br />
+                    U.men이 함께하겠습니다.
+                </p>
 
                 <button
                     onClick={handleGoogleLogin}
-                    className="w-full flex items-center justify-center gap-3 bg-white border border-slate-200 text-slate-700 py-4 rounded-xl font-medium hover:bg-slate-50 hover:border-slate-300 transition-all shadow-sm"
+                    className="w-full flex items-center justify-center gap-4 bg-white border border-slate-100 text-slate-700 py-5 rounded-2xl font-bold hover:shadow-lg hover:border-slate-200 transition-all duration-300 group/btn shadow-sm relative overflow-hidden"
                 >
-                    <svg className="w-5 h-5" viewBox="0 0 24 24">
+                    <div className="absolute inset-0 bg-slate-50 opacity-0 group-hover/btn:opacity-100 transition-opacity"></div>
+                    <svg className="w-6 h-6 relative z-10 group-hover/btn:scale-110 transition-transform duration-300" viewBox="0 0 24 24">
                         <path
                             fill="#4285F4"
                             d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -56,10 +75,10 @@ function LoginPageContent() {
                             d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
                         />
                     </svg>
-                    Google 계정으로 계속하기
+                    <span className="relative z-10 text-lg">Google로 나의 가능성 확인하기</span>
                 </button>
 
-                <p className="mt-8 text-xs text-slate-400">
+                <p className="mt-12 text-sm font-medium text-slate-400">
                     로그인 시 이용약관 및 개인정보처리방침에 동의하게 됩니다.
                 </p>
             </div>
