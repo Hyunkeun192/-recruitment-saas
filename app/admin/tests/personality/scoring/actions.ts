@@ -37,3 +37,32 @@ export async function fetchTestResultsForNorms(testId: string, startDate: string
         return { error: e.message };
     }
 }
+
+export async function fetchTestsAction() {
+    console.log("--> fetchTestsAction called");
+    if (!supabaseUrl || !supabaseServiceKey) {
+        console.error("Missing Env Vars:", { url: !!supabaseUrl, key: !!supabaseServiceKey });
+        throw new Error('Supabase environment details missing for Service Role');
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    try {
+        const { data, error } = await supabase
+            .from('tests')
+            .select('*')
+            .eq('type', 'PERSONALITY')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('Fetch Tests Error:', error);
+            throw new Error(error.message);
+        }
+        console.log("--> fetchTestsAction details", data?.length, data);
+
+        return { data };
+    } catch (e: any) {
+        console.error('Server Action Error:', e);
+        return { error: e.message };
+    }
+}

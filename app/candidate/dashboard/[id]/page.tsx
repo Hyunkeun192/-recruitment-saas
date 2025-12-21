@@ -77,6 +77,7 @@ function StatBar({ label, value, colorClass }: { label: string, value: number, c
 
 import InterpretationGuide from "./InterpretationGuide";
 import ReliabilityAnalysis from "./ReliabilityAnalysis";
+import MindCareAnalysis from "./MindCareAnalysis";
 import HistoryNavigator from "./HistoryNavigator";
 
 export default async function ReportDetail({ params }: { params: Promise<{ id: string }> }) {
@@ -347,6 +348,7 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
                         return acc;
                     }, {} as Record<string, number>)}
                 />
+                <MindCareAnalysis detailedScores={result.detailed_scores} />
             </div>
 
             {/* Multi-Attempt History & Growth Trends */}

@@ -43,6 +43,9 @@ export default function LandingHeader() {
             <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
                 <div className="font-bold text-2xl tracking-tighter">U.men.</div>
                 <div className="flex gap-4 items-center">
+                    <Link href="/community" className="text-sm font-bold text-slate-500 hover:text-indigo-600 transition-colors">
+                        U-Talk
+                    </Link>
                     {user ? (
                         <>
                             <Link

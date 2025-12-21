@@ -137,15 +137,15 @@ export default function ReliabilityAnalysis({ questions, answers }: ReliabilityA
         <div className="px-4">
             <div className={`bg-white border rounded-[2.5rem] transition-all duration-500 overflow-hidden ${isOpen
                 ? 'p-8 lg:p-10 shadow-xl border-amber-100 ring-1 ring-amber-100'
-                : 'p-6 shadow-sm border-slate-100 hover:shadow-md hover:border-slate-200'
+                : 'p-4 shadow-sm border-slate-100 hover:shadow-md hover:border-slate-200'
                 }`}>
                 {/* Toggle Header */}
                 <button
                     onClick={() => setIsOpen(!isOpen)}
                     className="w-full flex items-center justify-between group outline-none"
                 >
-                    <div className="flex items-center gap-5">
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all duration-500 ${warningCount > 0
+                    <div className="flex items-center gap-4">
+                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-lg transition-all duration-500 ${warningCount > 0
                             ? (isOpen ? 'bg-amber-500 shadow-amber-200' : 'bg-amber-500 shadow-amber-100')
                             : (isOpen ? 'bg-emerald-500 shadow-emerald-200' : 'bg-slate-100 text-slate-400 group-hover:bg-emerald-500 group-hover:text-white transition-colors')
                             }`}>
@@ -166,7 +166,7 @@ export default function ReliabilityAnalysis({ questions, answers }: ReliabilityA
                         </div>
                     </div>
 
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 transition-all duration-500 ${isOpen ? 'rotate-180 bg-slate-100' : 'group-hover:bg-white group-hover:shadow-sm'}`}>
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100 text-slate-400 transition-all duration-500 ${isOpen ? 'rotate-180 bg-slate-100' : 'group-hover:bg-white group-hover:shadow-sm'}`}>
                         <ChevronDown size={20} />
                     </div>
                 </button>

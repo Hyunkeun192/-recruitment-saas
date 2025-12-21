@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Save, AlertCircle, TrendingUp, Calculator, Calendar, ArrowRight, CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Check, Info } from 'lucide-react';
 import { toast } from 'sonner';
-import { fetchTestResultsForNorms } from './actions';
+import { fetchTestResultsForNorms, fetchTestsAction } from './actions';
 
 interface TestNorm {
     id?: string;
@@ -65,6 +65,7 @@ export default function PersonalityScoringManagement() {
 
     // Default Date Range: Last 30 days including TODAY
     useEffect(() => {
+        fetchTests();
         const end = new Date(); // To Today
         const start = new Date();
         start.setDate(end.getDate() - 30);
@@ -103,14 +104,10 @@ export default function PersonalityScoringManagement() {
     const fetchTests = async () => {
         try {
             setLoading(true);
-            const { data, error } = await supabase
-                .from('tests')
-                .select('*')
-                .eq('type', 'PERSONALITY')
-                .order('created_at', { ascending: false }) as any;
+            const { data, error } = await fetchTestsAction(); // Use server action to bypass RLS
 
             if (error) throw error;
-            setTests(data);
+            setTests(data || []);
             if (data && data.length > 0 && !selectedTestId) {
                 setSelectedTestId((data as any)[0].id);
             }
