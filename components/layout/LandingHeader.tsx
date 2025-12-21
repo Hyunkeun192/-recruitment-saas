@@ -106,12 +106,12 @@ export default function LandingHeader() {
                     {isMobileMenuOpen ? <X /> : <Menu />}
                 </button>
 
-                {/* Mobile Fullscreen Menu */}
+                {/* Mobile Dropdown Menu */}
                 {isMobileMenuOpen && (
-                    <div className="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center gap-8 md:hidden animate-in fade-in slide-in-from-top-10 duration-200">
+                    <div className="absolute top-20 right-6 w-64 bg-white border border-slate-100 rounded-2xl shadow-xl flex flex-col p-2 md:hidden animate-in fade-in slide-in-from-top-5 duration-200 z-50">
                         <Link
                             href="/community"
-                            className="text-2xl font-bold text-slate-800 hover:text-indigo-600"
+                            className="text-base font-bold text-slate-700 hover:text-indigo-600 hover:bg-slate-50 px-4 py-3 rounded-xl transition-colors"
                             onClick={() => setIsMobileMenuOpen(false)}
                         >
                             U-Talk
@@ -121,37 +121,39 @@ export default function LandingHeader() {
                             <>
                                 <Link
                                     href="/candidate/dashboard"
-                                    className="text-xl font-bold text-blue-600 bg-blue-50 px-6 py-3 rounded-full"
+                                    className="text-base font-bold text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-xl transition-colors"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     My Value Report
                                 </Link>
                                 <Link
                                     href="/admin/login"
-                                    className="text-lg font-medium text-slate-500"
+                                    className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 px-4 py-3 rounded-xl transition-colors"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Enter for Admin
                                 </Link>
+                                <div className="h-px bg-slate-100 my-1 mx-2"></div>
                                 <button
                                     onClick={handleLogout}
-                                    className="text-lg font-medium text-slate-500"
+                                    className="text-sm font-medium text-slate-500 hover:text-red-600 hover:bg-red-50 px-4 py-3 rounded-xl transition-colors text-left"
                                 >
-                                    See U
+                                    See U (Logout)
                                 </button>
                             </>
                         ) : (
                             <>
                                 <Link
                                     href="/login?next=/?loggedin=true"
-                                    className="text-xl font-bold text-blue-600 hover:text-blue-700"
+                                    className="text-base font-bold text-blue-600 hover:bg-blue-50 px-4 py-3 rounded-xl transition-colors"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Enter U.
                                 </Link>
+                                <div className="h-px bg-slate-100 my-1 mx-2"></div>
                                 <Link
                                     href="/admin/login"
-                                    className="text-lg font-medium text-slate-500"
+                                    className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 px-4 py-3 rounded-xl transition-colors"
                                     onClick={() => setIsMobileMenuOpen(false)}
                                 >
                                     Enter for Admin
