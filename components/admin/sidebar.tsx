@@ -5,11 +5,13 @@ import { usePathname, useSearchParams } from 'next/navigation';
 import { LayoutDashboard, FileText, Users, LogOut, Briefcase } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 
 export function Sidebar() {
     const router = useRouter();
 
     const handleLogout = async () => {
+        toast.success("See U");
         await supabase.auth.signOut();
         router.push('/admin/login');
     };
@@ -92,7 +94,7 @@ export function Sidebar() {
                     className="flex items-center gap-3 w-full px-4 py-2.5 text-sm text-slate-600 hover:bg-red-50 hover:text-red-600 rounded-lg transition-colors"
                 >
                     <LogOut size={18} />
-                    로그아웃
+                    See U
                 </button>
             </div>
         </aside>

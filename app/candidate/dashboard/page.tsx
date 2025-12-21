@@ -11,7 +11,8 @@ function calculatePercentile(tScore: number) {
     const d = 0.3989423 * Math.exp(-z * z / 2.0);
     const p = d * t * (0.3193815 + t * (-0.3565638 + t * (1.781478 + t * (-1.821256 + t * 1.330274))));
     const percentile = z >= 0 ? 1.0 - p : p;
-    return Math.round((1 - percentile) * 100);
+    // Ensure we don't return 0% for high performers. Minimum is Top 1%.
+    return Math.max(1, Math.round((1 - percentile) * 100));
 }
 
 export default async function CandidateDashboard() {
@@ -123,8 +124,9 @@ export default async function CandidateDashboard() {
                                 <div className="mb-6">
                                     <div className="text-[10px] font-bold text-slate-300 uppercase tracking-widest mb-2">BEST SCORE</div>
                                     <div className="flex items-center justify-between">
-                                        <div className="text-[64px] font-black text-slate-900 tracking-tighter group-hover:text-blue-600 transition-colors leading-none">
-                                            {Math.round(group.bestScore)}
+                                        <div className="flex items-baseline text-[64px] font-black text-slate-900 tracking-tighter group-hover:text-blue-600 transition-colors leading-none">
+                                            {group.bestScore.toFixed(1).split('.')[0]}
+                                            <span className="text-[32px] tracking-normal">.{group.bestScore.toFixed(1).split('.')[1]}</span>
                                         </div>
 
                                         <div className="flex flex-col gap-2">

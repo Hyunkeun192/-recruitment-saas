@@ -2,12 +2,26 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { User } from "@supabase/supabase-js";
+import { toast } from "sonner";
 
 export default function LandingHeader() {
     const [user, setUser] = useState<User | null>(null);
     const supabase = createClient();
+    const router = useRouter();
+
+    const handleLogout = async () => {
+        try {
+            toast.success("See U");
+            await supabase.auth.signOut();
+            setUser(null);
+            router.refresh();
+        } catch (error) {
+            console.error("Logout failed", error);
+        }
+    };
 
     useEffect(() => {
         const checkUser = async () => {
@@ -30,26 +44,42 @@ export default function LandingHeader() {
                 <div className="font-bold text-2xl tracking-tighter">U.men.</div>
                 <div className="flex gap-4 items-center">
                     {user ? (
-                        <Link
-                            href="/candidate/dashboard"
-                            className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 px-4 py-2 rounded-full"
-                        >
-                            My Value Report
-                        </Link>
+                        <>
+                            <Link
+                                href="/candidate/dashboard"
+                                className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors bg-blue-50 px-4 py-2 rounded-full"
+                            >
+                                My Value Report
+                            </Link>
+                            <Link
+                                href="/admin/login"
+                                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                            >
+                                Enter for Admin
+                            </Link>
+                            <button
+                                onClick={handleLogout}
+                                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                            >
+                                See U
+                            </button>
+                        </>
                     ) : (
-                        <Link
-                            href="/login?next=/?loggedin=true"
-                            className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
-                        >
-                            Enter U.
-                        </Link>
+                        <>
+                            <Link
+                                href="/login?next=/?loggedin=true"
+                                className="text-sm font-bold text-blue-600 hover:text-blue-700 transition-colors"
+                            >
+                                Enter U.
+                            </Link>
+                            <Link
+                                href="/admin/login"
+                                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
+                            >
+                                Enter for Admin
+                            </Link>
+                        </>
                     )}
-                    <Link
-                        href="/admin/login"
-                        className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-                    >
-                        Enter for Admin
-                    </Link>
                 </div>
             </div>
         </nav>

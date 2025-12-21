@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { Save, AlertCircle, TrendingUp, Calculator, Calendar, ArrowRight, CheckCircle2, Circle, Clock, ChevronDown, ChevronUp, Check, Info } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchTestResultsForNorms } from './actions';
 
 interface TestNorm {
     id?: string;
@@ -62,9 +63,9 @@ export default function PersonalityScoringManagement() {
     // View Details Modal
     const [viewVersion, setViewVersion] = useState<NormVersion | null>(null);
 
+    // Default Date Range: Last 30 days including TODAY
     useEffect(() => {
-        fetchTests();
-        const end = new Date();
+        const end = new Date(); // To Today
         const start = new Date();
         start.setDate(end.getDate() - 30);
         setEndDate(end.toISOString().split('T')[0]);
@@ -189,21 +190,72 @@ export default function PersonalityScoringManagement() {
         setPreviewStats(null);
 
         try {
-            const { data, error } = await (supabase.rpc as any)('calculate_norms_stages', {
-                p_test_id: selectedTestId,
-                p_start_date: startDate + 'T00:00:00Z',
-                p_end_date: endDate + 'T23:59:59Z',
-                p_stage: stage
+            // Use Server Action to bypass RLS
+            const { data, error } = await fetchTestResultsForNorms(selectedTestId, startDate, endDate);
+
+            if (error) throw new Error(error);
+            if (!data || data.length === 0) {
+                toast.info('조회된 데이터가 없습니다. (기간 및 응시 기록 확인)');
+                setCalculatingStage(null);
+                return;
+            }
+
+            const valuesMap: Record<string, number[]> = {};
+
+            data.forEach((row: any) => {
+                const details = row.detailed_scores;
+                if (!details) return;
+
+                if (stage === 'SCALE') {
+                    // details.scales: { 'Category': { raw: 10, t_score: 50 }, ... }
+                    const scales = details.scales || {};
+                    Object.entries(scales).forEach(([key, val]: [string, any]) => {
+                        let raw = typeof val === 'number' ? val : val.raw;
+                        if (raw !== undefined) {
+                            if (!valuesMap[key]) valuesMap[key] = [];
+                            valuesMap[key].push(raw);
+                        }
+                    });
+                } else if (stage === 'COMPETENCY') {
+                    const comps = details.competencies || {};
+                    Object.entries(comps).forEach(([key, val]: [string, any]) => {
+                        let raw = typeof val === 'number' ? val : val.raw;
+                        if (raw !== undefined) {
+                            if (!valuesMap[key]) valuesMap[key] = [];
+                            valuesMap[key].push(raw);
+                        }
+                    });
+                } else if (stage === 'TOTAL') {
+                    // [UPDATED] Use detailed_scores.raw_total (Sum of Competency T-Scores)
+                    const raw = details.raw_total;
+                    if (typeof raw === 'number') {
+                        if (!valuesMap['TOTAL']) valuesMap['TOTAL'] = [];
+                        valuesMap['TOTAL'].push(raw);
+                    }
+                }
             });
 
-            if (error) throw error;
-            const stats = data as CalculatedStat[];
+            const stats: CalculatedStat[] = Object.entries(valuesMap).map(([key, values]) => {
+                const n = values.length;
+                if (n === 0) return null;
+                const mean = values.reduce((a, b) => a + b, 0) / n;
+                const variance = values.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n > 1 ? n - 1 : 1);
+                const stdDev = Math.sqrt(variance);
+
+                return {
+                    category_name: key,
+                    mean_value: mean,
+                    std_dev_value: stdDev,
+                    sample_count: n,
+                    type: stage === 'SCALE' ? 'CATEGORY' : stage === 'COMPETENCY' ? 'COMPETENCY' : 'TOTAL'
+                };
+            }).filter(Boolean) as CalculatedStat[];
 
             if (!stats || stats.length === 0) {
-                toast.info('조회된 데이터가 없습니다.');
+                toast.info('계산 가능한 데이터가 없습니다.');
             } else {
                 setPreviewStats({ stage, data: stats });
-                toast.success('분석 완료. 결과를 검토하고 [적용 완료] 버튼을 눌러주세요.');
+                toast.success(`분석 완료 (샘플 N=${data.length}). 결과를 검토하고 [적용 완료] 버튼을 눌러주세요.`);
             }
         } catch (error: any) {
             console.error(error);
@@ -220,8 +272,8 @@ export default function PersonalityScoringManagement() {
             const newNorms = previewStats.data.map(stat => ({
                 test_id: selectedTestId,
                 category_name: stat.category_name,
-                mean_value: parseFloat(stat.mean_value.toFixed(2)),
-                std_dev_value: parseFloat(stat.std_dev_value.toFixed(2))
+                mean_value: parseFloat(stat.mean_value.toFixed(5)),
+                std_dev_value: parseFloat(stat.std_dev_value.toFixed(5))
             }));
 
             const { error } = await supabase
@@ -405,8 +457,8 @@ export default function PersonalityScoringManagement() {
                                     {previewStats?.data.map((row, i) => (
                                         <tr key={i} className="border-b last:border-0 hover:bg-slate-50">
                                             <td className="px-3 py-2 text-slate-700">{row.category_name}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.mean_value.toFixed(2)}</td>
-                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.std_dev_value.toFixed(2)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.mean_value.toFixed(5)}</td>
+                                            <td className="px-3 py-2 text-right font-mono text-slate-600">{row.std_dev_value.toFixed(5)}</td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -417,6 +469,23 @@ export default function PersonalityScoringManagement() {
                 )}
             </div>
         );
+    };
+
+    const handleDownloadVerificationData = () => {
+        if (!selectedTestId || !startDate || !endDate) {
+            toast.error('기간을 선택해주세요.');
+            return;
+        }
+
+        try {
+            toast.info('대용량 데이터 추출을 시작합니다.');
+            const url = `/api/export/norms?test_id=${selectedTestId}&start=${startDate}&end=${endDate}`;
+            window.location.href = url;
+
+        } catch (error: any) {
+            console.error(error);
+            toast.error('다운로드 요청 실패');
+        }
     };
 
     return (
@@ -503,6 +572,14 @@ export default function PersonalityScoringManagement() {
                                             value={endDate}
                                             onChange={(e) => setEndDate(e.target.value)}
                                         />
+                                        <button
+                                            onClick={handleDownloadVerificationData}
+                                            className="ml-2 px-3 py-2 bg-white border border-slate-300 text-slate-600 rounded-lg text-xs font-bold hover:bg-slate-50 shadow-sm flex items-center gap-1 group"
+                                            title="검증용 Raw Data 다운로드"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400 group-hover:text-slate-600"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                                            검증용 데이터
+                                        </button>
                                     </div>
                                 </div>
 

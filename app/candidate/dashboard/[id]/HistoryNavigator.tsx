@@ -65,7 +65,7 @@ export default function HistoryNavigator({
                                         Session {attempt.index}
                                     </div>
                                     <div className="flex items-end justify-between gap-2">
-                                        <div className="text-2xl font-black leading-none">{Math.round(attempt.score)}</div>
+                                        <div className="text-2xl font-black leading-none">{attempt.score.toFixed(1)}</div>
                                         <div className={`text-[10px] font-bold ${attempt.isCurrent ? 'text-indigo-200' : 'text-slate-400'}`}>
                                             {attempt.date}
                                         </div>
@@ -132,7 +132,11 @@ export default function HistoryNavigator({
                                     const barHeight = Math.min(100, Math.max(8, normalizedScore));
 
                                     return (
-                                        <div key={i} className="flex-1 h-full flex flex-col items-center justify-end gap-2 group/bar">
+                                        <Link
+                                            key={i}
+                                            href={`/candidate/dashboard/${a.id}`}
+                                            className="flex-1 h-full flex flex-col items-center justify-end gap-2 group/bar"
+                                        >
                                             {/* Tooltip on hover */}
                                             <div className="opacity-0 group-hover/bar:opacity-100 transition-opacity bg-slate-800 text-white text-[9px] py-1 px-2 rounded-md mb-1 pointer-events-none whitespace-nowrap">
                                                 {a.score.toFixed(0)}점
@@ -151,7 +155,7 @@ export default function HistoryNavigator({
                                             <div className={`text-[9px] font-black tracking-tighter ${a.isCurrent ? 'text-indigo-600' : 'text-slate-400'}`}>
                                                 {a.index}회
                                             </div>
-                                        </div>
+                                        </Link>
                                     );
                                 })}
                             </div>

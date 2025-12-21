@@ -14,40 +14,25 @@ if (!supabaseUrl || !supabaseKey) {
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function main() {
-    const token = 'e48db1df-9667-4621-955b-c36966c7a875';
-    console.log(`Checking token: ${token}`);
+    const testId = '159ade9e-5994-4bdf-a7f9-c08514dcf77f';
+    console.log(`Checking norms for test_id: ${testId}`);
 
-    const { data: tokenData, error: tokenError } = await supabase
-        .from('guest_access_tokens')
+    const { data: norms, error } = await supabase
+        .from('test_norms')
         .select('*')
-        .eq('token', token)
-        .single();
+        .eq('test_id', testId);
 
-    if (tokenError) {
-        console.error('Token Error:', tokenError);
-        return;
-    }
-    console.log('Token Data:', tokenData);
-
-    if (!tokenData) {
-        console.log('No token data found');
+    if (error) {
+        console.error('Error:', error);
         return;
     }
 
-    const { data: apps, error: appError } = await supabase
-        .from('applications')
-        .select('id, name, resume_url')
-        .eq('posting_id', tokenData.posting_id);
-
-    if (appError) {
-        console.error('App Error:', appError);
-        return;
-    }
-
-    console.log('Applications found:', apps?.length);
-    apps?.forEach(app => {
-        console.log(`App: ${app.name} (${app.id}) - Resume: ${app.resume_url}`);
-    });
+    console.log('--- Test Norms ---');
+    console.table(norms.map(n => ({
+        category: n.category_name,
+        mean: n.mean_value,
+        std_dev: n.std_dev_value
+    })));
 }
 
 main();

@@ -15,6 +15,7 @@ import {
     DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 export default function CandidateLayout({
     children,
@@ -39,6 +40,7 @@ export default function CandidateLayout({
             }
 
             setIsLoggingOut(true);
+            toast.success("See U");
             await supabase.auth.signOut();
             router.push("/"); // Go to home
             router.refresh();
@@ -66,7 +68,7 @@ export default function CandidateLayout({
                             className="text-sm font-medium text-slate-500 hover:text-red-500 flex items-center gap-1 transition-colors"
                         >
                             <LogOut size={16} />
-                            로그아웃
+                            See U
                         </button>
                     </div>
                 </div>
@@ -80,9 +82,9 @@ export default function CandidateLayout({
             <Dialog open={showLogoutDialog} onOpenChange={setShowLogoutDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>로그아웃 확인</DialogTitle>
+                        <DialogTitle>See U</DialogTitle>
                         <DialogDescription>
-                            로그아웃을 진행해도 괜찮을까요?
+                            See U soon?
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -94,7 +96,7 @@ export default function CandidateLayout({
                             onClick={handleConfirmLogout}
                             disabled={isLoggingOut}
                         >
-                            {isLoggingOut ? '로그아웃 중...' : '네, 로그아웃 합니다'}
+                            {isLoggingOut ? 'See U...' : '네, See U'}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

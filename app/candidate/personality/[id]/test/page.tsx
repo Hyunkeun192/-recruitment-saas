@@ -582,7 +582,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     if (memberTScores.length > 0) {
                         avgTScore = memberTScores.reduce((a: number, b: number) => a + b, 0) / memberTScores.length;
                     }
-                    competencyResults[comp.name] = { t_score: Math.round(avgTScore * 100) / 100 };
+                    competencyResults[comp.name] = { t_score: Math.round(avgTScore * 100000) / 100000 };
                 });
             } else {
                 // Fallback: If no competencies defined, use scale scores as competencies (Legacy behavior)
@@ -592,17 +592,42 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
             }
 
             // 6. Calculate Final Total T-Score
+            // [REFACTORED] Total Raw Score is now the SUM of Competency T-Scores (or Scale T-Scores if no competencies)
+            // This ensures weighting is balanced by competency structure.
+            let newTotalRawScore = 0;
+            const competencyNames = Object.keys(competencyResults);
+
+            if (competencyNames.length > 0) {
+                // Sum of Competency T-Scores
+                newTotalRawScore = competencyNames.reduce((sum, key) => sum + competencyResults[key].t_score, 0);
+            } else {
+                // Fallback: Sum of Scale T-Scores
+                newTotalRawScore = Object.values(scaleResults).reduce((sum, s) => sum + s.t_score, 0);
+            }
+
+            console.log(`[Submit] New Total Raw Score (Sum of T-Scores): ${newTotalRawScore}`);
+
             let finalTScore = 50;
             const totalNorm = normMap['TOTAL'] || normMap['ALL'] || normMap['total'] || null;
+
             if (totalNorm && totalNorm.stdDev > 0) {
-                const zScore = (totalRawScore - totalNorm.mean) / totalNorm.stdDev;
-                finalTScore = Math.round((zScore * 10 + 50) * 100) / 100;
+                // Use the NEW totalRawScore against the TOTAL norm
+                const zScore = (newTotalRawScore - totalNorm.mean) / totalNorm.stdDev;
+                finalTScore = Math.round((zScore * 10 + 50) * 100000) / 100000;
             } else {
-                const tScores = Object.values(scaleResults).map(c => c.t_score);
-                if (tScores.length > 0) {
-                    finalTScore = Math.round((tScores.reduce((a, b) => a + b, 0) / tScores.length) * 100) / 100;
+                // Heuristic Fallback if TOTAL norm is missing (Should not happen if migration is run)
+                // Just use average of components as a safe fallback?
+                // Or keep it 50.
+                if (competencyNames.length > 0) {
+                    finalTScore = newTotalRawScore / competencyNames.length;
+                } else {
+                    finalTScore = newTotalRawScore / Object.keys(scaleResults).length;
                 }
+                finalTScore = Math.round(finalTScore * 100000) / 100000;
             }
+
+            // Override the old item-based totalRawScore for DB saving
+            totalRawScore = newTotalRawScore;
 
             if (isNaN(finalTScore)) finalTScore = 50;
 
@@ -621,8 +646,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 answers_log: answers,
                 elapsed_seconds: elapsedSeconds,
                 completed_at: new Date().toISOString(),
-                total_score: finalTScore,
-                t_score: finalTScore,
+                total_score: Math.round(finalTScore), // DB REQUIRES INTEGER
+                t_score: Math.round(finalTScore),     // DB REQUIRES INTEGER
                 detailed_scores: detailed_scores
             };
 

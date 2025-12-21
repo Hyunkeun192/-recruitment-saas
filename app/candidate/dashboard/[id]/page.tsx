@@ -76,9 +76,12 @@ function StatBar({ label, value, colorClass }: { label: string, value: number, c
 }
 
 import InterpretationGuide from "./InterpretationGuide";
+import ReliabilityAnalysis from "./ReliabilityAnalysis";
 import HistoryNavigator from "./HistoryNavigator";
 
 export default async function ReportDetail({ params }: { params: Promise<{ id: string }> }) {
+
+
     const { id } = await params;
     const supabase = await createClient();
 
@@ -117,10 +120,15 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
         .eq("test_id", result.test_id);
 
     // 2. Fetch all possible questions for this test to build a lookup map
-    const { data: qRelations } = await supabase
-        .from('test_questions')
-        .select('is_practice, questions(*)')
-        .eq('test_id', result.test_id);
+    // 2. Fetch all possible questions and norms for this test
+    const [qRelationsResult, normsResult] = await Promise.all([
+        supabase.from('test_questions').select('is_practice, questions(*)').eq('test_id', result.test_id),
+        supabase.from('test_norms').select('*').eq('test_id', result.test_id)
+    ]);
+
+    const qRelations = qRelationsResult.data;
+    const norms = normsResult.data || [];
+    const normsMap = new Map(norms.map((n: any) => [n.category_name, n]));
 
     const questionsMap: Record<string, any> = {};
     const practiceIds = new Set<string>();
@@ -139,6 +147,34 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
     const details = (result.detailed_scores as any) || {};
     const competencies = details.competencies || {};
     const scales = details.scales || {};
+
+    // Helper to normalize score if needed
+    const getTScore = (name: string, val: any) => {
+        // Priority 1: If explicit t_score exists in object, use it
+        if (typeof val === 'object' && val !== null && typeof val.t_score === 'number') {
+            return val.t_score;
+        }
+
+        // Priority 2: If val is a number, checking if it is raw or T is ambiguous.
+        // But based on new seeding/submission logic, we likely store objects.
+        // If we must fallback for legacy data:
+        let score = typeof val === 'object' ? val.score : val; // handle { score: ... } or just number
+
+        // If it looks like a raw score (very low) AND we have norms, calculate T
+        const norm = normsMap.get(name);
+        if (typeof score === 'number' && score < 40 && norm && norm.std_dev_value) {
+            // This fallback is only for really low raw scores that are likely NOT T-scores
+            // But T-scores CAN be < 40 (1 SD below mean = 40).
+            // However, typical raw scores in 5-point scale (e.g. 5 items) max 25.
+            // Risk: Valid T=35 vs Raw=35. 
+            // Better to trust recent data structure. 
+            // If the user complains "not T-score", maybe they see Raw scores.
+            // Let's assume if it's NOT an object with t_score, we TRY to convert using norms if available.
+            const calculatedT = 50 + 10 * ((score - norm.mean_value) / norm.std_dev_value);
+            return calculatedT;
+        }
+        return score;
+    };
 
     // 3. Narrative Generation Engine
     const narratives: Record<string, { strengths: string[], weaknesses: string[] }> = {};
@@ -188,13 +224,94 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
         .order("completed_at", { ascending: true });
 
     const attempts = allResults || [];
-    const trendData = attempts.map((r, idx) => ({
-        id: r.id,
-        index: idx + 1,
-        score: r.total_score || 0,
-        date: new Date(r.completed_at!).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
-        isCurrent: r.id === id
-    }));
+    const trendData = attempts.map((r, idx) => {
+        // Use detailed_scores.total.t_score if available, otherwise fallback to total_score
+        // Ensure we display T-Score (usually < 100), not Raw Score (> 100 for total)
+        const detailedTotal = (r.detailed_scores as any)?.total;
+        let score = typeof detailedTotal === 'number' ? detailedTotal : detailedTotal?.t_score;
+
+        if (score === undefined || score === null) {
+            score = r.total_score || 0;
+        }
+
+        // If score is large (> 100), it's likely a raw score. 
+        // We should ideally show T-Score. If we can't find T-Score, show Raw but maybe flag it? 
+        // For now, prioritize detailed.t_score which is explicitly T.
+
+        return {
+            id: r.id,
+            index: idx + 1,
+            score: Number(score.toFixed(1)), // Ensure formatting
+            date: new Date(r.completed_at!).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+            isCurrent: r.id === id
+        };
+    });
+
+
+
+    // 4. Group Scales (High / Low)
+    const EXCLUDED_SCALES = [
+        '지시불이행', '거짓말', '자기신뢰도검증',
+        '공격성', '의존성 성격장애', '의존성성격장애',
+        '편접성 성격장애', '편집성 성격장애', '편집성성격장애',
+        '불안/우울 장애', '불안/우울', '불안/우울장애',
+        '조현형성격장애', '조현형 성격장애',
+        '반사회적 성격장애', '반사회적성격장애',
+        '경계선 성격장애', '경계선성격장애'
+    ];
+
+    const normalizeName = (s: string) => s.replace(/\s+/g, '').trim();
+
+    const processedScales = Object.entries(scales)
+        .filter(([name]) => !EXCLUDED_SCALES.map(normalizeName).includes(normalizeName(name))) // Robust filter
+        .map(([name, val]: [string, any]) => ({
+            name,
+            score: getTScore(name, val)
+        }));
+
+    // Top 4 High Scores (>= 60, Descending)
+    const highScores = processedScales
+        .filter(s => s.score >= 60)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 4);
+
+    // Top 4 Low Scores (<= 40, Ascending)
+    const lowScores = processedScales
+        .filter(s => s.score <= 40)
+        .sort((a, b) => a.score - b.score)
+        .slice(0, 4);
+
+    // Helper to render a card
+    const renderScaleCard = (item: { name: string, score: number } | undefined, type: 'high' | 'low') => {
+        if (!item) {
+            return (
+                <div key={Math.random()} className="bg-slate-50 border border-slate-100 border-dashed rounded-[2rem] p-8 flex flex-col items-center justify-center text-center h-full min-h-[160px] opacity-70">
+                    <p className="text-slate-400 font-medium text-sm">
+                        {type === 'high' ? 'Blank' : 'Blank'}
+                    </p>
+                </div>
+            );
+        }
+
+        const isHigh = type === 'high';
+        const colorClass = isHigh ? 'bg-blue-400' : 'bg-orange-400';
+        const bgClass = isHigh ? 'bg-blue-100 text-blue-600' : 'bg-orange-100 text-orange-600';
+
+        return (
+            <div key={item.name} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100/60 hover:shadow-md transition-shadow group h-full">
+                <div className="flex justify-between items-center mb-6">
+                    <div className={`px-3 py-1 rounded-xl flex items-center justify-center font-bold text-xs ${bgClass}`}>
+                        {isHigh ? 'High' : 'Low'}
+                    </div>
+                    <div className="text-2xl font-black text-slate-700">{item.score.toFixed(1)}</div>
+                </div>
+                <h4 className="font-bold text-slate-800 mb-2 truncate">{item.name}</h4>
+                <div className="h-1.5 w-full bg-slate-100 rounded-full mb-4">
+                    <div className={`h-full rounded-full ${colorClass}`} style={{ width: `${Math.min(100, (item.score / 100) * 100)}%` }}></div>
+                </div>
+            </div>
+        );
+    };
 
     return (
         <div className="max-w-6xl mx-auto space-y-10 pb-20 relative">
@@ -216,16 +333,21 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
                         <span className="ml-3 text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600">Deep Dive</span>
                     </h1>
                 </div>
-                <div className="bg-white border border-slate-100 rounded-2xl px-6 py-4 shadow-sm flex items-center gap-4">
-                    <div className="text-sm">
-                        <div className="text-slate-400 font-medium text-right">검사 완료일</div>
-                        <div className="text-slate-700 font-bold">{new Date(result.completed_at!).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
-                    </div>
-                </div>
+
             </header>
 
             {/* Report Interpretation Guide (Interactive) */}
-            <InterpretationGuide />
+            <div className="space-y-4">
+                <InterpretationGuide />
+                <ReliabilityAnalysis
+                    questions={Object.values(questionsMap)}
+                    answers={qOrder.reduce((acc, qId, idx) => {
+                        const val = answers[idx] ?? (answers as any)[idx.toString()];
+                        if (val !== undefined) acc[qId] = val;
+                        return acc;
+                    }, {} as Record<string, number>)}
+                />
+            </div>
 
             {/* Multi-Attempt History & Growth Trends */}
             <HistoryNavigator attempts={trendData} testId={result.test_id} />
@@ -304,28 +426,38 @@ export default async function ReportDetail({ params }: { params: Promise<{ id: s
                 </div>
 
                 <div className="md:col-span-12 bg-slate-50/30 border border-slate-100 rounded-[3rem] p-10 lg:p-14 shadow-inner">
-                    <div className="max-w-4xl mx-auto space-y-12">
+                    <div className="max-w-4xl mx-auto space-y-16">
                         <div className="text-center space-y-2">
                             <h2 className="text-3xl font-black tracking-tight text-slate-800">상세 특성 분석</h2>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
-                            {Object.entries(scales).map(([name, val]: [string, any], idx) => {
-                                const displayScore = typeof val === 'object' ? val.t_score : val;
-                                return (
-                                    <div key={name} className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100/60 hover:shadow-md transition-shadow group">
-                                        <div className="flex justify-between items-center mb-6">
-                                            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs ${idx % 3 === 0 ? 'bg-blue-100 text-blue-600' : idx % 3 === 1 ? 'bg-purple-100 text-purple-600' : 'bg-orange-100 text-orange-600'}`}>
-                                                0{idx + 1}
-                                            </div>
-                                            <div className="text-2xl font-black text-slate-700">{displayScore.toFixed(1)}</div>
-                                        </div>
-                                        <h4 className="font-bold text-slate-800 mb-2 truncate">{name}</h4>
-                                        <div className="h-1.5 w-full bg-slate-100 rounded-full mb-4">
-                                            <div className={`h-full rounded-full ${idx % 3 === 0 ? 'bg-blue-400' : idx % 3 === 1 ? 'bg-purple-400' : 'bg-orange-400'}`} style={{ width: `${Math.min(100, (displayScore / 100) * 100)}%` }}></div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+
+                        {/* High Scores Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                                    <TrendingUp size={20} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-700">돋보이는 강점 (Top 4)</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {[...Array(4)].map((_, i) => renderScaleCard(highScores[i], 'high'))}
+                            </div>
+                        </div>
+
+                        {/* Divider */}
+                        <div className="h-px bg-slate-200/50"></div>
+
+                        {/* Low Scores Section */}
+                        <div className="space-y-6">
+                            <div className="flex items-center gap-3">
+                                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
+                                    <Info size={20} />
+                                </div>
+                                <h3 className="text-xl font-bold text-slate-700">관리 및 보완 (Bottom 4)</h3>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                                {[...Array(4)].map((_, i) => renderScaleCard(lowScores[i], 'low'))}
+                            </div>
                         </div>
                     </div>
                 </div>
