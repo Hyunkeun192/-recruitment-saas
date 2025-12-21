@@ -718,8 +718,8 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
     return (
         <div className="w-full py-10 overflow-hidden min-h-screen flex flex-col select-none">
-            <div className="max-w-4xl mx-auto w-full px-6 mb-8 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-4">
+            <div className="max-w-4xl mx-auto w-full px-6 mb-8 flex flex-wrap md:flex-nowrap items-center justify-between shrink-0">
+                <div className="flex items-center gap-4 order-1">
                     <div className="flex items-center gap-2 text-slate-500">
                         <span className="font-bold text-slate-900">검사 진행 중</span>
                     </div>
@@ -727,6 +727,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
 
                 <div className={`
                     flex items-center gap-2 px-4 py-2 rounded-full font-mono font-bold shadow-sm border transition-all duration-300
+                    order-3 w-full justify-center mt-4 md:w-auto md:order-2 md:mt-0
                     ${timeLimitMinutes && ((timeLimitMinutes * 60 - elapsedSeconds) <= 300)
                         ? 'bg-red-50 text-red-600 border-red-200 animate-pulse text-2xl px-6'
                         : 'bg-white text-slate-700 border-slate-200 text-lg'}
@@ -735,7 +736,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     {getTimeDisplay()}
                 </div>
 
-                <div className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                <div className="text-sm font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full order-2 md:order-3">
                     {Math.min(currentIndex + 1, questions.length)}/{questions.length}
                 </div>
             </div>
