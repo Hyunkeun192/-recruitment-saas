@@ -17,6 +17,7 @@ export const metadata: Metadata = {
   description: "Find U in Unique",
 };
 
+import InAppBrowserCheck from "@/app/components/InAppBrowserCheck";
 import QueryProvider from "@/lib/providers/query-provider";
 import { Toaster } from "sonner";
 
@@ -32,6 +33,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         <QueryProvider>
+          <InAppBrowserCheck />
           {children}
           <Toaster richColors position="top-center" />
         </QueryProvider>
