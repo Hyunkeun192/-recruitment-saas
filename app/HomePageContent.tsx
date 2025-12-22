@@ -45,7 +45,7 @@ export function UTalkLounge({ posts }: { posts: any[] }) {
                                         {post.category}
                                     </span>
                                     <span className="text-xs text-slate-400">
-                                        {new Date(post.created_at).toLocaleDateString()}
+                                        {new Date(post.created_at).toLocaleDateString('ko-KR')}
                                     </span>
                                 </div>
                                 <h3 className="text-lg font-bold text-slate-800 mb-2 line-clamp-1 group-hover:text-indigo-600 transition-colors">

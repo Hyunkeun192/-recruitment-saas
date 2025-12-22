@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createServerSupabaseClient } from '@/lib/supabase-server';
+import { calculatePersonalityScores } from '@/lib/scoring';
 
 export async function POST(request: Request) {
     try {
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
         if (testType === 'PERSONALITY') {
             // --- PERSONALITY SCORING LOGIC ---
 
+
             // A. Fetch necessary data: Norms, Competencies
             const [normsResult, competenciesResult] = await Promise.all([
                 (supabase.from('test_norms') as any).select('*').eq('test_id', testId),
@@ -61,15 +63,8 @@ export async function POST(request: Request) {
             const norms = (normsResult as any).data || [];
             const competencies = (competenciesResult as any).data || [];
 
-            // Helper to get T-Score
-            const calculateTScore = (raw: number, cat: string) => {
-                const norm = norms.find((n: any) => n.category_name === cat);
-                if (!norm || !norm.std_dev_value || norm.std_dev_value === 0) return 50; // Default to mean if no norm
-                return 50 + 10 * ((raw - norm.mean_value) / norm.std_dev_value);
-            };
-
-            // B. Calculate Scale Raw Scores
-            const scaleRawScores: Record<string, number> = {};
+            // B. Prepare Input for Scoring (Map { qId: idx } to { qId: scoreValue })
+            const answersMap: Record<string, number> = {};
 
             scoredAnswers = Object.entries(answers).map(([qId, selectedIdx]) => {
                 const question = questions.find((q: any) => q.id === qId);
@@ -77,6 +72,8 @@ export async function POST(request: Request) {
 
                 // Assumption: selectedIdx is 0-based index. Score = index + 1.
                 const scoreValue = (typeof selectedIdx === 'number' ? selectedIdx : parseInt(selectedIdx as string)) + 1;
+
+                answersMap[qId] = scoreValue;
 
                 return {
                     question_id: qId,
@@ -86,52 +83,45 @@ export async function POST(request: Request) {
                 };
             }).filter(Boolean);
 
-            // Sum up Scale Raw Scores
-            scoredAnswers.forEach((ans: any) => {
-                const cat = ans.category;
-                if (cat) {
-                    scaleRawScores[cat] = (scaleRawScores[cat] || 0) + ans.score;
-                }
-            });
+            // C. Calculate Scores using Shared Lib
+            // Need to map questions to { id, category } interface
+            const questionList = questions.map((q: any) => ({
+                id: q.id,
+                category: q.category
+            }));
 
-            // C. Calculate Scale T-Scores
-            const scaleTScores: Record<string, number> = {};
-            Object.entries(scaleRawScores).forEach(([cat, raw]) => {
-                scaleTScores[cat] = calculateTScore(raw, cat);
-            });
+            // Need to map competencies
+            const compList = competencies.map((c: any) => ({
+                name: c.name,
+                competency_scales: c.competency_scales
+            }));
 
-            // D. Calculate Competency Scores
-            // Competency Raw = Sum of Scale T-Scores
-            const competencyScores: Record<string, { raw: number, t_score: number }> = {};
+            // Split norms into Scale vs Competency based on names
+            const scaleNames = new Set(questionList.map((q: any) => q.category));
+            const compNames = new Set(compList.map((c: any) => c.name));
 
-            competencies.forEach((comp: any) => {
-                const scaleNames = comp.competency_scales.map((cs: any) => cs.scale_name);
-                let compRaw = 0;
-                scaleNames.forEach((sName: string) => {
-                    compRaw += (scaleTScores[sName] || 0);
-                });
+            const scaleNorms = norms.filter((n: any) => scaleNames.has(n.category_name)).map((n: any) => ({
+                category_name: n.category_name,
+                mean_value: n.mean_value,
+                std_dev_value: n.std_dev_value
+            }));
 
-                const compT = calculateTScore(compRaw, comp.name);
-                competencyScores[comp.name] = {
-                    raw: compRaw,
-                    t_score: compT
-                };
-            });
+            const competencyNorms = norms.filter((n: any) => compNames.has(n.category_name) || n.category_name === 'TOTAL').map((n: any) => ({
+                category_name: n.category_name,
+                mean_value: n.mean_value,
+                std_dev_value: n.std_dev_value
+            }));
 
-            // E. Calculate Total Score
-            // Total Raw = Sum of Competency T-Scores
-            let totalRaw = 0;
-            Object.values(competencyScores).forEach((c: any) => {
-                totalRaw += c.t_score;
-            });
-            const totalT = calculateTScore(totalRaw, 'TOTAL');
+            const calculated = calculatePersonalityScores(
+                answersMap,
+                questionList,
+                scaleNorms,
+                competencyNorms,
+                compList
+            );
 
-            totalScore = totalT;
-            detailScores = {
-                scales: scaleTScores,
-                competencies: competencyScores,
-                total: { raw: totalRaw, t_score: totalT }
-            };
+            detailScores = calculated;
+            totalScore = calculated.total.t_score;
 
         } else {
             // --- APTITUDE (Legacy) SCORING LOGIC ---
