@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { LayoutDashboard, FileText, Users, LogOut, Briefcase } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, LogOut, Briefcase, MessageCircle } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
@@ -86,6 +86,16 @@ export function Sidebar() {
                 <NavLink href="/admin/candidates" icon={<Users size={18} />}>
                     지원자 현황
                 </NavLink>
+
+                <div className="pt-4 pb-2 border-t border-slate-100 mt-4">
+                    <p className="px-6 text-xs font-semibold text-slate-400 mb-2">콘텐츠</p>
+                    <NavLink href="/admin/contents" icon={<Briefcase size={18} />}>
+                        U-Class 관리
+                    </NavLink>
+                    <NavLink href="/admin/comments" icon={<MessageCircle size={18} />}>
+                        댓글 관리
+                    </NavLink>
+                </div>
             </nav>
 
             <div className="p-4 border-t">

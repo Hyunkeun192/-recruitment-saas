@@ -175,6 +175,30 @@ async function main() {
 
     console.log(`Total Norm Mean: ${tMean}, Std: ${tStd} (Expected ~200)`);
 
+    // --- 3.2 Insert Norms to DB with Prefixes ---
+    console.log('Inserting Norms into DB...');
+    // Delete old norms
+    await supabase.from('test_norms').delete().eq('test_id', TEST_ID);
+
+    const normPayload = [
+        ...scaleNorms.map(n => ({
+            test_id: TEST_ID,
+            category_name: `Scale_${n.category_name}`,
+            mean_value: n.mean_value,
+            std_dev_value: n.std_dev_value
+        })),
+        ...competencyNorms.map(n => ({
+            test_id: TEST_ID,
+            category_name: `Comp_${n.category_name}`,
+            mean_value: n.mean_value,
+            std_dev_value: n.std_dev_value
+        }))
+    ];
+
+    const { error: normError } = await supabase.from('test_norms').insert(normPayload);
+    if (normError) console.error('Error inserting norms:', normError);
+    else console.log(`Inserted ${normPayload.length} norms.`);
+
     // --- FINAL: Generate Payloads ---
     console.log('Final Pass: Generating Payload...');
     const { data: posting } = await supabase.from('postings').select('id').limit(1).single();

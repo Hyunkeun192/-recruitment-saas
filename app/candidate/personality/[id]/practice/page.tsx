@@ -59,7 +59,7 @@ export default function PersonalityPracticePage({ params }: { params: Promise<{ 
     // But we have a completion card at index 3.
     // Let's make the bar filled when index == length.
     const progressPercent = PRACTICE_QUESTIONS.length > 0
-        ? (Math.min(currentIndex + 1, PRACTICE_QUESTIONS.length) / PRACTICE_QUESTIONS.length) * 100
+        ? (Math.min(currentIndex, PRACTICE_QUESTIONS.length) / PRACTICE_QUESTIONS.length) * 100
         : 0;
 
     return (

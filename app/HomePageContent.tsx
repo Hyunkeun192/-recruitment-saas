@@ -6,6 +6,8 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { toast } from "sonner";
 import LandingHeader from "@/components/layout/LandingHeader";
+import UClassSection from "@/app/components/UClassSection";
+import { AdminContent } from "@/app/admin/contents/actions";
 
 export function UTalkLounge({ posts }: { posts: any[] }) {
     // if (posts.length === 0) return null; // Always show to potential users
@@ -68,11 +70,10 @@ export function UTalkLounge({ posts }: { posts: any[] }) {
                     ))}
                 </div>
             )}
-        </section>
-    );
+        </section>);
 }
 
-export default function HomePageContent({ initialPosts }: { initialPosts: any[] }) {
+export default function HomePageContent({ initialPosts, uClassContents }: { initialPosts: any[], uClassContents: AdminContent[] }) {
     const searchParams = useSearchParams();
 
     useEffect(() => {
@@ -170,6 +171,11 @@ export default function HomePageContent({ initialPosts }: { initialPosts: any[] 
                     </div>
 
                 </section>
+
+
+
+                {/* U-Class Section (Mentor's Pick) */}
+                <UClassSection contents={uClassContents} />
 
                 {/* U-Talk Lounge Section */}
                 <UTalkLounge posts={initialPosts} />

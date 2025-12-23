@@ -96,21 +96,25 @@ export async function POST(request: Request) {
                 competency_scales: c.competency_scales
             }));
 
-            // Split norms into Scale vs Competency based on names
-            const scaleNames = new Set(questionList.map((q: any) => q.category));
-            const compNames = new Set(compList.map((c: any) => c.name));
+            // Split norms into Scale vs Competency based on prefixes
+            // Scale Norms: 'Scale_{name}'
+            // Comp Norms: 'Comp_{name}' or 'Comp_TOTAL'
 
-            const scaleNorms = norms.filter((n: any) => scaleNames.has(n.category_name)).map((n: any) => ({
-                category_name: n.category_name,
-                mean_value: n.mean_value,
-                std_dev_value: n.std_dev_value
-            }));
+            const scaleNorms = norms
+                .filter((n: any) => n.category_name.startsWith('Scale_'))
+                .map((n: any) => ({
+                    category_name: n.category_name.replace('Scale_', ''),
+                    mean_value: n.mean_value,
+                    std_dev_value: n.std_dev_value
+                }));
 
-            const competencyNorms = norms.filter((n: any) => compNames.has(n.category_name) || n.category_name === 'TOTAL').map((n: any) => ({
-                category_name: n.category_name,
-                mean_value: n.mean_value,
-                std_dev_value: n.std_dev_value
-            }));
+            const competencyNorms = norms
+                .filter((n: any) => n.category_name.startsWith('Comp_'))
+                .map((n: any) => ({
+                    category_name: n.category_name.replace('Comp_', ''),
+                    mean_value: n.mean_value,
+                    std_dev_value: n.std_dev_value
+                }));
 
             const calculated = calculatePersonalityScores(
                 answersMap,
