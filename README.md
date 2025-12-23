@@ -57,10 +57,22 @@
 8.  **interview_slots:** 면접 일정 스케줄링.
 9.  **evaluations:** 평가 점수(Draft/Submitted), 코멘트, 회피 여부.
 10. **audit_logs:** 개인정보 접근 및 다운로드 이력 기록.
+11. **admin_contents:** U-Class 콘텐츠(아티클, 비디오) 데이터.
+12. **admin_content_comments:** U-Class 아티클의 댓글/답변 데이터(계층형 구조).
 
 ## 4. Key Functional Requirements (개발 가이드)
 
-### A. Frontend Layout & UI
+### A. U-Class (Content Platform) [NEW]
+1.  **Content Management:**
+    * 관리자는 아티클(WYSIWYG 에디터) 및 비디오(YouTube Embed) 콘텐츠를 생성/관리.
+    * 게시글 상태 관리 (Public/Private Toggle).
+2.  **Interactive Learning:**
+    * **Comment System:** 사용자는 아티클에 댓글(질문)을 남길 수 있음 (공개/비공개 지원).
+    * **Admin Reply:** 관리자는 대시보드에서 미답변 댓글을 확인하고 답변 작성 가능.
+3.  **Security:**
+    * 비밀글은 작성자 본인과 관리자만 열람 가능 (Data Masking Server Action 처리).
+
+### B. Frontend Layout & UI
 1.  **Evaluator Interface (Split View):**
     * 평가 화면은 반드시 **좌우 분할(Split View)**되어야 함.
     * **Left:** 이력서/포트폴리오 뷰어 (PDF 뷰어 포함).
@@ -97,6 +109,7 @@ AI 에이전트는 반드시 아래의 기술 스택을 사용하여 코드를 �
 * **Styling Engine:** Tailwind CSS (빠른 스타일링 및 일관성 유지)
 * **Component Library:** shadcn/ui 또는 Radix UI (접근성 및 고품질 UI 보장)
 * **Icons:** Lucide React
+* **Editor:** react-quill-new (React 19 호환 WYSIWYG)
 * **Layout:**
     * Dashboard: Sidebar Navigation Layout
     * Evaluator Mode: Split View Layout (Left: PDF/Doc Viewer, Right: Form)
