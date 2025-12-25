@@ -8,6 +8,8 @@ import { toast } from "sonner";
 import LandingHeader from "@/components/layout/LandingHeader";
 import UClassSection from "@/app/components/UClassSection";
 import { AdminContent } from "@/app/admin/contents/actions";
+import PreRegisterModal from "@/components/modal/PreRegisterModal";
+import { useState } from "react";
 
 export function UTalkLounge({ posts }: { posts: any[] }) {
     // if (posts.length === 0) return null; // Always show to potential users
@@ -74,22 +76,31 @@ export function UTalkLounge({ posts }: { posts: any[] }) {
 }
 
 export default function HomePageContent({ initialPosts, uClassContents }: { initialPosts: any[], uClassContents: AdminContent[] }) {
-    const searchParams = useSearchParams();
+    const [isPreRegisterOpen, setIsPreRegisterOpen] = useState(false);
+    const [isRegistered, setIsRegistered] = useState(false);
 
     useEffect(() => {
-        if (searchParams.get('loggedin') === 'true') {
-            toast.success('로그인되었습니다 :)', {
-                duration: 3000,
-                className: 'font-bold text-lg',
-            });
-            // Clean up the URL
-            const newUrl = window.location.pathname;
-            window.history.replaceState({}, '', newUrl);
+        if (typeof window !== 'undefined') {
+            const registered = localStorage.getItem('registered') === 'true';
+            setIsRegistered(registered);
         }
-    }, [searchParams]);
+    }, []);
+
+    // ... existing login toast useEffect ...
 
     return (
         <div className="min-h-screen bg-white text-slate-900 font-sans selection:bg-[#B3E5FC] selection:text-slate-900">
+
+            <PreRegisterModal
+                isOpen={isPreRegisterOpen}
+                onClose={() => {
+                    setIsPreRegisterOpen(false);
+                    // Check again on close in case they registered
+                    if (typeof window !== 'undefined') {
+                        setIsRegistered(localStorage.getItem('registered') === 'true');
+                    }
+                }}
+            />
 
             {/* Navigation */}
             <LandingHeader />
@@ -108,6 +119,36 @@ export default function HomePageContent({ initialPosts, uClassContents }: { init
                     <p className="mt-6 text-xl text-slate-500 font-medium max-w-2xl">
                         평범함 속에서 당신만의 특별함을 찾으세요.
                     </p>
+
+                    {/* Pre-register Button */}
+                    <div className="mt-10">
+                        <button
+                            onClick={() => !isRegistered && setIsPreRegisterOpen(true)}
+                            disabled={isRegistered}
+                            className={`px-8 py-4 rounded-full font-bold text-lg shadow-xl hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 flex items-center gap-2
+                                ${isRegistered
+                                    ? 'bg-slate-100 text-slate-400 cursor-default shadow-none border border-slate-200'
+                                    : 'bg-slate-900 text-white hover:bg-slate-800'}`
+                            }
+                        >
+                            {isRegistered ? (
+                                <>
+                                    <span className="w-2 h-2 rounded-full bg-slate-400"></span>
+                                    사전 신청 완료
+                                </>
+                            ) : (
+                                <>
+                                    오픈 알림 신청하고 할인받기
+                                    <ArrowRight size={20} />
+                                </>
+                            )}
+                        </button>
+                        {!isRegistered && (
+                            <p className="mt-3 text-xs font-bold text-blue-500 animate-pulse">
+                                🔥 현재 72명 대기 중! 마감 임박
+                            </p>
+                        )}
+                    </div>
                 </section>
 
                 {/* Services Grid (Bento Grid Layout) */}
