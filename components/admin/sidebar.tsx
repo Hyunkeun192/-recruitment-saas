@@ -20,7 +20,7 @@ export function Sidebar() {
         <aside className="w-64 bg-white border-r shadow-sm hidden md:flex flex-col">
             <div className="p-6 border-b">
                 <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                    MEETUP
+                    U.men.
                 </h1>
                 <p className="text-xs text-slate-500 mt-1">관리자 콘솔</p>
             </div>

@@ -53,7 +53,7 @@ export default function AdminLoginPage() {
                         <Lock size={32} />
                     </div>
                     <h1 className="text-2xl font-bold text-slate-900">관리자 로그인</h1>
-                    <p className="text-slate-500 mt-2">MEETUP 채용 관리 시스템</p>
+                    <p className="text-slate-500 mt-2">U.men. 채용 관리 시스템</p>
                 </div>
 
                 <div className="p-8">
@@ -99,7 +99,7 @@ export default function AdminLoginPage() {
 
                     <div className="mt-6 text-center">
                         <p className="text-xs text-slate-400">
-                            &copy; MEETUP Admin Console. Authorized personnel only.
+                            &copy; U.men. Admin Console. Authorized personnel only.
                         </p>
                     </div>
                 </div>
