@@ -14,7 +14,7 @@ export default function PreRegisterModal({ isOpen, onClose }: PreRegisterModalPr
     const [email, setEmail] = useState('');
     const [agreed, setAgreed] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [currentCount, setCurrentCount] = useState(72); // Mock count
+    const [currentCount, setCurrentCount] = useState(0);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -111,9 +111,9 @@ export default function PreRegisterModal({ isOpen, onClose }: PreRegisterModalPr
                                 />
                                 <Check size={10} className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity" />
                             </div>
-                            <label htmlFor="privacy-agree" className="text-xs text-slate-400 cursor-pointer select-none leading-snug">
+                            <label htmlFor="privacy-agree" className="text-xs text-slate-600 cursor-pointer select-none leading-snug">
                                 할인 혜택 제공 및 오픈 알림 전송을 위해<br />
-                                <span className="underline hover:text-slate-600">개인정보 수집 및 이용</span>에 동의합니다.
+                                <span className="underline hover:text-slate-800">개인정보 수집 및 이용</span>에 동의합니다.
                             </label>
                         </div>
 
