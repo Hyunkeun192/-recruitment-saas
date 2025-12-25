@@ -290,7 +290,7 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 finalQuestions = [...practiceQuestions, ...array];
 
                 // [NEW] Get current max attempt_number to support multi-attempts
-                const { data: maxAttemptData } = await supabase
+                const { data: maxAttemptData, error: maxAttError } = await supabase
                     .from('test_results')
                     .select('attempt_number')
                     .eq('test_id', testId)
@@ -299,8 +299,10 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                     .limit(1)
                     .maybeSingle();
 
+                if (maxAttError) console.error('[Init] Failed to fetch max attempt:', maxAttError);
+
                 const nextAttemptNumber = ((maxAttemptData as any)?.attempt_number || 0) + 1;
-                console.log(`[Init] Calculated next attempt_number: ${nextAttemptNumber}`);
+                console.log(`[Init] Calculated next attempt_number: ${nextAttemptNumber} (Max found: ${(maxAttemptData as any)?.attempt_number ?? 'None'})`);
 
                 const { data: newResult, error: createError } = await supabase
                     .from('test_results')
@@ -326,11 +328,16 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                             .select('id, questions_order')
                             .eq('test_id', testId)
                             .eq('user_id', user.id)
+                            .order('created_at', { ascending: false }) // Get latest
+                            .limit(1)
                             .maybeSingle();
 
                         if (retryError || !retryResult) {
                             console.error('[Init] Recovery failed:', retryError);
-                            throw createError; // Throw original error if recovery fails
+                            // If recovery fails, it means we can't SELECT it.
+                            // But we know it exists (duplicate key).
+                            // This confirms RLS issue.
+                            throw createError;
                         }
 
                         console.log('[Init] Recovery success, using existing result:', (retryResult as any).id);
