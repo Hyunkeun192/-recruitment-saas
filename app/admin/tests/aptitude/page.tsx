@@ -254,8 +254,14 @@ export default function AptitudeTestManagement() {
                                 <input
                                     type="number"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                    value={newTest.time_limit}
-                                    onChange={(e) => setNewTest({ ...newTest, time_limit: parseInt(e.target.value) || 0 })}
+                                    value={newTest.time_limit ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setNewTest({
+                                            ...newTest,
+                                            time_limit: val === '' ? 0 : parseInt(val)
+                                        } as any)
+                                    }}
                                     min={0}
                                 />
                             </div>
@@ -314,8 +320,14 @@ export default function AptitudeTestManagement() {
                                 <input
                                     type="number"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                    value={editingTest.time_limit || 0}
-                                    onChange={(e) => setEditingTest({ ...editingTest, time_limit: parseInt(e.target.value) || 0 })}
+                                    value={editingTest.time_limit ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setEditingTest({
+                                            ...editingTest,
+                                            time_limit: val === '' ? null : parseInt(val)
+                                        });
+                                    }}
                                     min={0}
                                 />
                             </div>

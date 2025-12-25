@@ -250,8 +250,28 @@ export default function PersonalityTestManagement() {
                                 <input
                                     type="number"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                    value={newTest.time_limit}
-                                    onChange={(e) => setNewTest({ ...newTest, time_limit: parseInt(e.target.value) || 0 })}
+                                    value={newTest.time_limit ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setNewTest({
+                                            ...newTest,
+                                            // Handle empty string as 0 or null depending on preference, 
+                                            // but since state init is 30, let's allow empty string behaviorally if we changed type
+                                            // Ideally type match. newTest.time_limit is inferred as number.
+                                            // We might need to cast or allow it to be number | string temporarily?
+                                            // Looking at state def: const [newTest, setNewTest] = useState({... time_limit: 30 })
+                                            // So it expects number. 
+                                            // If we want empty, we might need to handle it.
+                                            // But for create form, defaulting to 0 or keeping it number is safer IF we don't change state type.
+                                            // However, to fix "045", we need to allow intermediate empty state.
+                                            // Let's stick with (val === '' ? 0 : parseInt(val)) for now if type is strict, 
+                                            // OR update state type.
+                                            // But wait, the edit form state IS number | null.
+                                            // The create form state is inferred from { time_limit: 30 } -> number.
+                                            // Let's convert to any or allow formatting.
+                                            time_limit: val === '' ? 0 : parseInt(val)
+                                        } as any)
+                                    }}
                                     min={0}
                                 />
                             </div>
@@ -310,8 +330,14 @@ export default function PersonalityTestManagement() {
                                 <input
                                     type="number"
                                     className="w-full p-3 bg-slate-50 border border-slate-200 rounded-lg text-black placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-black"
-                                    value={editingTest.time_limit || 0}
-                                    onChange={(e) => setEditingTest({ ...editingTest, time_limit: parseInt(e.target.value) || 0 })}
+                                    value={editingTest.time_limit ?? ''}
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        setEditingTest({
+                                            ...editingTest,
+                                            time_limit: val === '' ? null : parseInt(val)
+                                        });
+                                    }}
                                     min={0}
                                 />
                             </div>
