@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, FileText, Search, User } from 'lucide-react';
+import { ArrowRight, FileText, Search, User, X } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { Badge } from "@/components/ui/badge";
-import Link from 'next/link';
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import ReportContent from "@/components/report/ReportContent";
 
 export const dynamic = 'force-dynamic';
 
@@ -17,6 +19,7 @@ interface TestResult {
     total_score: number;
     t_score?: number;
     completed_at: string | null;
+    attempt_number: number;
 }
 
 interface Candidate {
@@ -31,6 +34,12 @@ export default function CandidatesPage() {
     const [candidates, setCandidates] = useState<Candidate[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+
+    // Report Modal State
+    const [selectedReportId, setSelectedReportId] = useState<string | null>(null);
+    const [reportOwnerName, setReportOwnerName] = useState<string>('');
+    const [reportData, setReportData] = useState<any>(null);
+    const [loadingReport, setLoadingReport] = useState(false);
 
     useEffect(() => {
         fetchCandidates();
@@ -48,28 +57,21 @@ export default function CandidatesPage() {
 
             if (userError) throw userError;
 
-            // 2. Fetch Test Results for these users
-            // We fetch all relevant results and map them. 
-            // Optimization: If users list is huge, this might need pagination or careful querying.
-            // For now, fetching all results for displayed users is acceptable.
-
             const userIds = users.map(u => u.id);
-
             if (userIds.length === 0) {
                 setCandidates([]);
                 setLoading(false);
                 return;
             }
 
-            // Using 'in' query for results
+            // 2. Fetch Test Results
             const { data: results, error: resError } = await supabase
                 .from('test_results')
                 .select(`
-                    id, user_id, test_id, total_score, t_score, completed_at,
+                    id, user_id, test_id, total_score, t_score, completed_at, attempt_number,
                     tests ( title, type )
                 `)
                 .in('user_id', userIds)
-                //.not('completed_at', 'is', null) // Show incomplete? maybe yes to show "In Progress"
                 .order('created_at', { ascending: false });
 
             if (resError) throw resError;
@@ -84,8 +86,9 @@ export default function CandidatesPage() {
                         test_title: r.tests?.title,
                         test_type: r.tests?.type,
                         total_score: r.total_score,
-                        t_score: r.t_score, // Use T-score for Personality usually
-                        completed_at: r.completed_at
+                        t_score: r.t_score,
+                        completed_at: r.completed_at,
+                        attempt_number: r.attempt_number ?? 1
                     }));
 
                 return {
@@ -107,6 +110,80 @@ export default function CandidatesPage() {
         }
     };
 
+    const handleOpenReport = async (resultId: string, ownerName: string) => {
+        setSelectedReportId(resultId);
+        setReportOwnerName(ownerName);
+        setLoadingReport(true);
+        setReportData(null);
+
+        try {
+            // 1. Fetch detailed result
+            const { data: result, error: rErr } = await supabase
+                .from("test_results")
+                .select(`
+                    id, total_score, completed_at, detailed_scores, answers_log, questions_order, test_id, user_id,
+                    tests ( id, title, type, description )
+                `)
+                .eq("id", resultId)
+                .single();
+            if (rErr) throw rErr;
+
+            // 2. Fetch metadata (competencies, norms, questions) needed for report
+            const [compRes, qRes, normsRes, historyRes] = await Promise.all([
+                supabase.from("competencies").select(`id, name, description, competency_scales(scale_name)`).eq("test_id", result.test_id),
+                supabase.from("test_questions").select('is_practice, questions(*)').eq('test_id', result.test_id),
+                supabase.from("test_norms").select('*').eq('test_id', result.test_id),
+                supabase.from("test_results").select('id, total_score, completed_at, detailed_scores, attempt_number')
+                    .eq("test_id", result.test_id).eq("user_id", result.user_id).order("completed_at", { ascending: true })
+            ]);
+
+            const normsMap = new Map((normsRes.data || []).map((n: any) => [n.category_name, n]));
+
+            const questionsMap: Record<string, any> = {};
+            const practiceIds = new Set<string>();
+            qRes.data?.forEach((r: any) => {
+                const q = Array.isArray(r.questions) ? r.questions[0] : r.questions;
+                if (q) {
+                    questionsMap[q.id] = q;
+                    if (r.is_practice) practiceIds.add(q.id);
+                }
+            });
+
+            const answers = (result.answers_log as Record<string, number>) || {};
+            const qOrder = (result.questions_order as string[]) || [];
+            const validQOrder = qOrder.filter((qid: string) => !practiceIds.has(qid));
+
+            const trendData = (historyRes.data || []).map((r: any, idx: number) => {
+                const detailedTotal = (r.detailed_scores as any)?.total;
+                let score = typeof detailedTotal === 'number' ? detailedTotal : detailedTotal?.t_score;
+                if (score === undefined || score === null) score = r.total_score || 0;
+
+                return {
+                    id: r.id, index: idx + 1, score: Number(score.toFixed(1)),
+                    date: new Date(r.completed_at!).toLocaleDateString('ko-KR', { month: 'numeric', day: 'numeric' }),
+                    isCurrent: r.id === resultId
+                };
+            });
+
+            setReportData({
+                result,
+                competencies: compRes.data || [],
+                questionsMap,
+                answers,
+                qOrder: validQOrder, // Ensure practice questions are filtered for report logic
+                normMap: normsMap,
+                trends: trendData
+            });
+
+        } catch (e) {
+            console.error(e);
+            toast.error("리포트 데이터를 불러오는데 실패했습니다.");
+            setSelectedReportId(null);
+        } finally {
+            setLoadingReport(false);
+        }
+    };
+
     const filteredCandidates = candidates.filter(c =>
     (c.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         c.email.toLowerCase().includes(searchTerm.toLowerCase()))
@@ -116,8 +193,6 @@ export default function CandidatesPage() {
         const target = results.find(r => r.test_type === type && r.completed_at);
         if (!target) return <span className="text-slate-300">-</span>;
 
-        // Personality usually uses T-score, Aptitude uses total_score (or percentage)
-        // Let's display T-score for Personality if available, else total.
         const score = type === 'PERSONALITY' ? (target.t_score ?? target.total_score) : target.total_score;
 
         return (
@@ -143,7 +218,6 @@ export default function CandidatesPage() {
                 </div>
             </div>
 
-            {/* Use simple table layout */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
                 <div className="p-4 border-b bg-slate-50 flex justify-between items-center">
                     <div className="relative max-w-sm w-full">
@@ -171,20 +245,20 @@ export default function CandidatesPage() {
                                 <th className="px-6 py-4">가입일</th>
                                 <th className="px-6 py-4 text-center">인성검사</th>
                                 <th className="px-6 py-4 text-center">적성검사</th>
-                                <th className="px-6 py-4 text-center">상태</th>
                                 <th className="px-6 py-4 text-right">리포트</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y">
                             {filteredCandidates.length === 0 ? (
                                 <tr>
-                                    <td colSpan={7} className="px-6 py-10 text-center text-slate-400">
+                                    <td colSpan={6} className="px-6 py-10 text-center text-slate-400">
                                         검색 결과가 없습니다.
                                     </td>
                                 </tr>
                             ) : (
                                 filteredCandidates.map(candidate => {
-                                    const hasCompletedAny = candidate.results.some(r => r.completed_at);
+                                    // Collect all completed tests
+                                    const completedTests = candidate.results.filter(r => r.completed_at);
 
                                     return (
                                         <tr key={candidate.id} className="hover:bg-slate-50 transition-colors">
@@ -206,25 +280,23 @@ export default function CandidatesPage() {
                                             <td className="px-6 py-4 text-center">
                                                 {getScoreDisplay(candidate.results, 'APTITUDE')}
                                             </td>
-                                            <td className="px-6 py-4 text-center">
-                                                {hasCompletedAny ? (
-                                                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100 border-none">검사완료</Badge>
-                                                ) : (
-                                                    <Badge variant="outline" className="text-slate-400 font-normal">미응시</Badge>
-                                                )}
-                                            </td>
                                             <td className="px-6 py-4 text-right">
-                                                {/* If there is a completed result, show link to report */}
-                                                {candidate.results.filter(r => r.completed_at).map(r => (
-                                                    <Link
-                                                        key={r.id}
-                                                        href={`/report/${r.id}`} // Assuming report URL structure
-                                                        target="_blank"
-                                                        className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline ml-2"
-                                                    >
-                                                        {r.test_type === 'PERSONALITY' ? '인성' : '적성'} <ArrowRight size={10} />
-                                                    </Link>
-                                                ))}
+                                                <div className="flex flex-col gap-1 items-end">
+                                                    {completedTests.length === 0 ? (
+                                                        <span className="text-xs text-slate-400">응시 이력 없음</span>
+                                                    ) : (
+                                                        completedTests.map(r => (
+                                                            <button
+                                                                key={r.id}
+                                                                onClick={() => handleOpenReport(r.id, candidate.full_name || candidate.email)}
+                                                                className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
+                                                            >
+                                                                <FileText size={12} />
+                                                                {r.test_title} ({r.attempt_number}회차)
+                                                            </button>
+                                                        ))
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -234,6 +306,46 @@ export default function CandidatesPage() {
                     </table>
                 )}
             </div>
+
+            {/* Report Modal */}
+            <Dialog open={!!selectedReportId} onOpenChange={(open) => !open && setSelectedReportId(null)}>
+                <DialogContent className="max-w-5xl h-[90vh] p-0 overflow-hidden flex flex-col bg-slate-50">
+                    <div className="px-6 py-4 border-b bg-white flex justify-between items-center shrink-0">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-lg font-bold text-slate-800">
+                                {reportOwnerName ? `${reportOwnerName}님의 My Value Report` : "My Value Report"}
+                            </h2>
+                            {reportData?.result?.completed_at && (
+                                <span className="text-xs text-slate-500 px-2 py-1 bg-slate-100 rounded-md">
+                                    응시일: {new Date(reportData.result.completed_at).toLocaleDateString()}
+                                </span>
+                            )}
+                        </div>
+                        {/* Native Close is handled by Dialog primitives usually, but extra close button is fine too */}
+                    </div>
+
+                    <ScrollArea className="flex-1 h-full bg-slate-50">
+                        <div className="p-6">
+                            {loadingReport ? (
+                                <div className="py-20 flex flex-col items-center justify-center gap-4 text-slate-400">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-current"></div>
+                                    <p>리포트를 불러오는 중입니다...</p>
+                                </div>
+                            ) : reportData ? (
+                                <ReportContent
+                                    {...reportData}
+                                    isAdmin={true}
+                                />
+                            ) : (
+                                <div className="py-20 text-center text-slate-400">
+                                    데이터를 불러올 수 없습니다.
+                                </div>
+                            )}
+                        </div>
+                    </ScrollArea>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
+
