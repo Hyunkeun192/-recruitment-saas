@@ -78,12 +78,22 @@ export function UTalkLounge({ posts }: { posts: any[] }) {
 export default function HomePageContent({ initialPosts, uClassContents }: { initialPosts: any[], uClassContents: AdminContent[] }) {
     const [isPreRegisterOpen, setIsPreRegisterOpen] = useState(false);
     const [isRegistered, setIsRegistered] = useState(false);
+    const [waitlistCount, setWaitlistCount] = useState<number | null>(null);
 
     useEffect(() => {
         if (typeof window !== 'undefined') {
             const registered = localStorage.getItem('registered') === 'true';
             setIsRegistered(registered);
         }
+
+        fetch('/api/waitlist')
+            .then(res => res.json())
+            .then(data => {
+                if (typeof data.count === 'number') {
+                    setWaitlistCount(data.count);
+                }
+            })
+            .catch(console.error);
     }, []);
 
     // ... existing login toast useEffect ...
@@ -99,6 +109,11 @@ export default function HomePageContent({ initialPosts, uClassContents }: { init
                     if (typeof window !== 'undefined') {
                         setIsRegistered(localStorage.getItem('registered') === 'true');
                     }
+                    // Refresh count
+                    fetch('/api/waitlist')
+                        .then(res => res.json())
+                        .then(data => setWaitlistCount(data.count))
+                        .catch(console.error);
                 }}
             />
 
@@ -143,9 +158,9 @@ export default function HomePageContent({ initialPosts, uClassContents }: { init
                                 </>
                             )}
                         </button>
-                        {!isRegistered && (
+                        {!isRegistered && waitlistCount !== null && (
                             <p className="mt-3 text-xs font-bold text-blue-500 animate-pulse">
-                                🔥 현재 72명 대기 중! 마감 임박
+                                🔥 현재 {waitlistCount}명 대기 중! 마감 임박
                             </p>
                         )}
                     </div>
