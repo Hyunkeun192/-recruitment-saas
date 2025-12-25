@@ -4,6 +4,7 @@
 import Link from 'next/link';
 import { Calendar, TrendingUp, TrendingDown, ChevronRight, Activity } from 'lucide-react';
 
+
 interface Attempt {
     id: string;
     score: number;
@@ -14,10 +15,12 @@ interface Attempt {
 
 export default function HistoryNavigator({
     attempts,
-    testId
+    testId,
+    onSelectAttempt
 }: {
     attempts: Attempt[],
-    testId: string
+    testId: string,
+    onSelectAttempt?: (id: string) => void
 }) {
     // Show even for 1st attempt to display the total score
     if (attempts.length === 0) return null;
@@ -30,6 +33,30 @@ export default function HistoryNavigator({
     const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
     const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
+
+    const renderItemContent = (attempt: Attempt) => (
+        <>
+            <div className={`text-[10px] font-black uppercase tracking-wider mb-1 ${attempt.isCurrent ? 'text-indigo-200' : 'text-slate-300'}`}>
+                Session {attempt.index}
+            </div>
+            <div className="flex items-end justify-between gap-2">
+                <div className="text-2xl font-black leading-none">{attempt.score.toFixed(1)}</div>
+                <div className={`text-[10px] font-bold ${attempt.isCurrent ? 'text-indigo-200' : 'text-slate-400'}`}>
+                    {attempt.date}
+                </div>
+            </div>
+            {attempt.isCurrent && (
+                <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100 scale-90">
+                    <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" />
+                </div>
+            )}
+        </>
+    );
+
+    const itemClassName = (isCurrent: boolean) => `relative p-4 rounded-2xl border transition-all duration-300 group text-left w-full h-full ${isCurrent
+        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100'
+        : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'
+        }`;
 
     return (
         <div className="px-4">
@@ -53,29 +80,23 @@ export default function HistoryNavigator({
                     <div className="flex-1">
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-3 gap-3">
                             {attempts.map((attempt) => (
-                                <Link
-                                    key={attempt.id}
-                                    href={`/candidate/dashboard/${attempt.id}`}
-                                    className={`relative p-4 rounded-2xl border transition-all duration-300 group ${attempt.isCurrent
-                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-100'
-                                        : 'bg-white border-slate-100 text-slate-600 hover:border-indigo-200 hover:bg-indigo-50/30'
-                                        }`}
-                                >
-                                    <div className={`text-[10px] font-black uppercase tracking-wider mb-1 ${attempt.isCurrent ? 'text-indigo-200' : 'text-slate-300'}`}>
-                                        Session {attempt.index}
-                                    </div>
-                                    <div className="flex items-end justify-between gap-2">
-                                        <div className="text-2xl font-black leading-none">{attempt.score.toFixed(1)}</div>
-                                        <div className={`text-[10px] font-bold ${attempt.isCurrent ? 'text-indigo-200' : 'text-slate-400'}`}>
-                                            {attempt.date}
-                                        </div>
-                                    </div>
-                                    {attempt.isCurrent && (
-                                        <div className="absolute -top-1.5 -right-1.5 w-6 h-6 bg-white rounded-full flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100 scale-90">
-                                            <div className="w-2 h-2 bg-indigo-600 rounded-full animate-pulse" />
-                                        </div>
-                                    )}
-                                </Link>
+                                onSelectAttempt ? (
+                                    <button
+                                        key={attempt.id}
+                                        onClick={() => onSelectAttempt(attempt.id)}
+                                        className={itemClassName(attempt.isCurrent)}
+                                    >
+                                        {renderItemContent(attempt)}
+                                    </button>
+                                ) : (
+                                    <Link
+                                        key={attempt.id}
+                                        href={`/candidate/dashboard/${attempt.id}`}
+                                        className={itemClassName(attempt.isCurrent)}
+                                    >
+                                        {renderItemContent(attempt)}
+                                    </Link>
+                                )
                             ))}
                         </div>
                     </div>
@@ -131,12 +152,8 @@ export default function HistoryNavigator({
                                     const normalizedScore = ((a.score - min) / (max - min)) * 100;
                                     const barHeight = Math.min(100, Math.max(8, normalizedScore));
 
-                                    return (
-                                        <Link
-                                            key={i}
-                                            href={`/candidate/dashboard/${a.id}`}
-                                            className="flex-1 h-full flex flex-col items-center justify-end gap-2 group/bar"
-                                        >
+                                    const content = (
+                                        <>
                                             {/* Tooltip on hover */}
                                             <div className="opacity-0 group-hover/bar:opacity-100 transition-opacity bg-slate-800 text-white text-[9px] py-1 px-2 rounded-md mb-1 pointer-events-none whitespace-nowrap">
                                                 {a.score.toFixed(0)}점
@@ -155,6 +172,26 @@ export default function HistoryNavigator({
                                             <div className={`text-[9px] font-black tracking-tighter ${a.isCurrent ? 'text-indigo-600' : 'text-slate-400'}`}>
                                                 {a.index}회
                                             </div>
+                                        </>
+                                    );
+
+                                    const className = "flex-1 h-full flex flex-col items-center justify-end gap-2 group/bar cursor-pointer";
+
+                                    return onSelectAttempt ? (
+                                        <div
+                                            key={i}
+                                            onClick={() => onSelectAttempt(a.id)}
+                                            className={className}
+                                        >
+                                            {content}
+                                        </div>
+                                    ) : (
+                                        <Link
+                                            key={i}
+                                            href={`/candidate/dashboard/${a.id}`}
+                                            className={className}
+                                        >
+                                            {content}
                                         </Link>
                                     );
                                 })}
@@ -171,3 +208,4 @@ export default function HistoryNavigator({
         </div>
     );
 }
+

@@ -17,6 +17,7 @@ interface ReportContentProps {
     trends: any[];
     isAdmin?: boolean; // If true, hide "Back to Dashboard" link
     onBack?: () => void; // Optional back handler for modal
+    onSelectAttempt?: (id: string) => void;
 }
 
 function NormalDistributionGraph({ tScore }: { tScore: number }) {
@@ -98,7 +99,8 @@ export default function ReportContent({
     normMap,
     trends,
     isAdmin = false,
-    onBack
+    onBack,
+    onSelectAttempt
 }: ReportContentProps) {
     const details = (result.detailed_scores as any) || {};
     const compScores = details.competencies || {};
@@ -244,7 +246,7 @@ export default function ReportContent({
                 <MindCareAnalysis detailedScores={result.detailed_scores} />
             </div>
 
-            <HistoryNavigator attempts={trends} testId={result.test_id} />
+            <HistoryNavigator attempts={trends} testId={result.test_id} onSelectAttempt={onSelectAttempt} />
 
             <div className="grid grid-cols-1 md:grid-cols-12 gap-8 px-4">
                 <div className="md:col-span-12 lg:col-span-12 bg-white border border-slate-100 rounded-[2.5rem] p-10 shadow-xl shadow-slate-100/50 flex flex-col space-y-8">

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
-import { ArrowRight, FileText, Search, User, X } from 'lucide-react';
+import { Search, User, FileText, ChevronRight } from 'lucide-react';
 import { toast, Toaster } from 'sonner';
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
@@ -48,11 +48,10 @@ export default function CandidatesPage() {
     const fetchCandidates = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Candidates (role = 'CANDIDATE')
             const { data: users, error: userError } = await supabase
                 .from('users')
                 .select('*')
-                .eq('role', 'CANDIDATE')
+                // Removed role filter to show all users including Admins for testing
                 .order('created_at', { ascending: false });
 
             if (userError) throw userError;
@@ -64,7 +63,6 @@ export default function CandidatesPage() {
                 return;
             }
 
-            // 2. Fetch Test Results
             const { data: results, error: resError } = await supabase
                 .from('test_results')
                 .select(`
@@ -72,11 +70,10 @@ export default function CandidatesPage() {
                     tests ( title, type )
                 `)
                 .in('user_id', userIds)
-                .order('created_at', { ascending: false });
+                .order('completed_at', { ascending: false }); // Latest first
 
             if (resError) throw resError;
 
-            // Map results to users
             const formatted: Candidate[] = users.map(user => {
                 const userResults = results
                     .filter(r => r.user_id === user.id)
@@ -110,14 +107,11 @@ export default function CandidatesPage() {
         }
     };
 
-    const handleOpenReport = async (resultId: string, ownerName: string) => {
-        setSelectedReportId(resultId);
-        setReportOwnerName(ownerName);
+    // Separate fetch function for logic reuse
+    const fetchReportDetail = async (resultId: string) => {
         setLoadingReport(true);
         setReportData(null);
-
         try {
-            // 1. Fetch detailed result
             const { data: result, error: rErr } = await supabase
                 .from("test_results")
                 .select(`
@@ -128,7 +122,6 @@ export default function CandidatesPage() {
                 .single();
             if (rErr) throw rErr;
 
-            // 2. Fetch metadata (competencies, norms, questions) needed for report
             const [compRes, qRes, normsRes, historyRes] = await Promise.all([
                 supabase.from("competencies").select(`id, name, description, competency_scales(scale_name)`).eq("test_id", result.test_id),
                 supabase.from("test_questions").select('is_practice, questions(*)').eq('test_id', result.test_id),
@@ -153,6 +146,7 @@ export default function CandidatesPage() {
             const qOrder = (result.questions_order as string[]) || [];
             const validQOrder = qOrder.filter((qid: string) => !practiceIds.has(qid));
 
+            // Populate trend data
             const trendData = (historyRes.data || []).map((r: any, idx: number) => {
                 const detailedTotal = (r.detailed_scores as any)?.total;
                 let score = typeof detailedTotal === 'number' ? detailedTotal : detailedTotal?.t_score;
@@ -170,7 +164,7 @@ export default function CandidatesPage() {
                 competencies: compRes.data || [],
                 questionsMap,
                 answers,
-                qOrder: validQOrder, // Ensure practice questions are filtered for report logic
+                qOrder: validQOrder,
                 normMap: normsMap,
                 trends: trendData
             });
@@ -178,10 +172,23 @@ export default function CandidatesPage() {
         } catch (e) {
             console.error(e);
             toast.error("리포트 데이터를 불러오는데 실패했습니다.");
-            setSelectedReportId(null);
+            // Don't close modal on error, let user see error state or retry?
+            // Usually keeping it open but empty or error message is better.
         } finally {
             setLoadingReport(false);
         }
+    }
+
+    const handleOpenReport = async (resultId: string, ownerName: string) => {
+        setSelectedReportId(resultId);
+        setReportOwnerName(ownerName);
+        await fetchReportDetail(resultId);
+    };
+
+    // Callback for HistoryNavigator inside the modal
+    const handleAttemptSelect = async (newResultId: string) => {
+        // Just update the content, keeping modal open
+        await fetchReportDetail(newResultId);
     };
 
     const filteredCandidates = candidates.filter(c =>
@@ -190,7 +197,11 @@ export default function CandidatesPage() {
     );
 
     const getScoreDisplay = (results: TestResult[], type: 'APTITUDE' | 'PERSONALITY') => {
-        const target = results.find(r => r.test_type === type && r.completed_at);
+        // Prioritize Latest Completed Attempt
+        const target = results
+            .filter(r => r.test_type === type && r.completed_at)
+            .sort((a, b) => new Date(b.completed_at!).getTime() - new Date(a.completed_at!).getTime())[0];
+
         if (!target) return <span className="text-slate-300">-</span>;
 
         const score = type === 'PERSONALITY' ? (target.t_score ?? target.total_score) : target.total_score;
@@ -257,8 +268,21 @@ export default function CandidatesPage() {
                                 </tr>
                             ) : (
                                 filteredCandidates.map(candidate => {
-                                    // Collect all completed tests
+                                    // Group results by test_id and pick the latest one for each test
                                     const completedTests = candidate.results.filter(r => r.completed_at);
+
+                                    // Grouping Logic
+                                    const groupedResults: Record<string, { latest: TestResult, count: number }> = {};
+                                    completedTests.forEach(r => {
+                                        if (!groupedResults[r.test_id]) {
+                                            groupedResults[r.test_id] = { latest: r, count: 0 };
+                                        }
+                                        groupedResults[r.test_id].count += 1;
+                                        // Update if this one is newer
+                                        if (new Date(r.completed_at!) > new Date(groupedResults[r.test_id].latest.completed_at!)) {
+                                            groupedResults[r.test_id].latest = r;
+                                        }
+                                    });
 
                                     return (
                                         <tr key={candidate.id} className="hover:bg-slate-50 transition-colors">
@@ -282,19 +306,31 @@ export default function CandidatesPage() {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex flex-col gap-1 items-end">
-                                                    {completedTests.length === 0 ? (
+                                                    {Object.keys(groupedResults).length === 0 ? (
                                                         <span className="text-xs text-slate-400">응시 이력 없음</span>
                                                     ) : (
-                                                        completedTests.map(r => (
-                                                            <button
-                                                                key={r.id}
-                                                                onClick={() => handleOpenReport(r.id, candidate.full_name || candidate.email)}
-                                                                className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 px-2 py-1 rounded transition-colors"
-                                                            >
-                                                                <FileText size={12} />
-                                                                {r.test_title} ({r.attempt_number}회차)
-                                                            </button>
-                                                        ))
+                                                        Object.values(groupedResults).map(group => {
+                                                            const r = group.latest;
+                                                            return (
+                                                                <button
+                                                                    key={r.id}
+                                                                    onClick={() => handleOpenReport(r.id, candidate.full_name || candidate.email)}
+                                                                    className="group flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 bg-slate-50 hover:bg-blue-50 px-2.5 py-1.5 rounded-lg border border-slate-100 hover:border-blue-100 transition-all"
+                                                                >
+                                                                    <FileText size={12} className="text-slate-400 group-hover:text-blue-500" />
+                                                                    <span>{r.test_title}</span>
+                                                                    {group.count > 1 && (
+                                                                        <Badge variant="secondary" className="h-4 px-1 text-[9px] bg-slate-100 text-slate-500 group-hover:bg-blue-100 group-hover:text-blue-600">
+                                                                            총 {group.count}회
+                                                                        </Badge>
+                                                                    )}
+                                                                    <span className="text-slate-300 group-hover:text-blue-400 ml-0.5">
+                                                                        {r.attempt_number}회차
+                                                                    </span>
+                                                                    <ChevronRight size={10} className="text-slate-300 group-hover:text-blue-500" />
+                                                                </button>
+                                                            );
+                                                        })
                                                     )}
                                                 </div>
                                             </td>
@@ -321,7 +357,6 @@ export default function CandidatesPage() {
                                 </span>
                             )}
                         </div>
-                        {/* Native Close is handled by Dialog primitives usually, but extra close button is fine too */}
                     </div>
 
                     <ScrollArea className="flex-1 h-full bg-slate-50">
@@ -335,6 +370,7 @@ export default function CandidatesPage() {
                                 <ReportContent
                                     {...reportData}
                                     isAdmin={true}
+                                    onSelectAttempt={handleAttemptSelect}
                                 />
                             ) : (
                                 <div className="py-20 text-center text-slate-400">
@@ -348,4 +384,3 @@ export default function CandidatesPage() {
         </div>
     );
 }
-
