@@ -52,7 +52,8 @@ export default function CandidatesPage() {
                 .from('users')
                 .select('*')
                 // Removed role filter to show all users including Admins for testing
-                .order('created_at', { ascending: false });
+                .order('created_at', { ascending: false })
+                .returns<any[]>();
 
             if (userError) throw userError;
 
@@ -70,7 +71,8 @@ export default function CandidatesPage() {
                     tests ( title, type )
                 `)
                 .in('user_id', userIds)
-                .order('completed_at', { ascending: false }); // Latest first
+                .order('completed_at', { ascending: false }) // Latest first
+                .returns<any[]>();
 
             if (resError) throw resError;
 
@@ -119,7 +121,7 @@ export default function CandidatesPage() {
                     tests ( id, title, type, description )
                 `)
                 .eq("id", resultId)
-                .single();
+                .single<any>();
             if (rErr) throw rErr;
 
             const [compRes, qRes, normsRes, historyRes] = await Promise.all([
