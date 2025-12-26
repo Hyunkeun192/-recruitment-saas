@@ -244,8 +244,13 @@ export default function HomePageContent({ initialPosts, uClassContents }: { init
                     <div className="text-sm font-bold text-slate-400">
                         Sincerely, your mentor.
                     </div>
-                    <div className="text-xs text-slate-300">
-                        © U.men.
+                    <div className="flex items-center gap-3">
+                        <Link href="/admin/login" className="text-[10px] text-slate-200 hover:text-slate-400 transition-colors">
+                            Admin
+                        </Link>
+                        <div className="text-xs text-slate-300">
+                            © U.men.
+                        </div>
                     </div>
                 </div>
             </footer>

@@ -67,12 +67,7 @@ export default function LandingHeader() {
                             >
                                 My Value Report
                             </Link>
-                            <Link
-                                href="/admin/login"
-                                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-                            >
-                                Enter for Admin
-                            </Link>
+
                             <button
                                 onClick={handleLogout}
                                 className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
@@ -88,12 +83,7 @@ export default function LandingHeader() {
                             >
                                 Enter U.
                             </Link>
-                            <Link
-                                href="/admin/login"
-                                className="text-sm font-medium text-slate-500 hover:text-slate-900 transition-colors"
-                            >
-                                Enter for Admin
-                            </Link>
+
                         </>
                     )}
                 </div>
@@ -126,13 +116,7 @@ export default function LandingHeader() {
                                 >
                                     My Value Report
                                 </Link>
-                                <Link
-                                    href="/admin/login"
-                                    className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 px-4 py-3 rounded-xl transition-colors"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                >
-                                    Enter for Admin
-                                </Link>
+
                                 <div className="h-px bg-slate-100 my-1 mx-2"></div>
                                 <button
                                     onClick={handleLogout}
@@ -151,13 +135,7 @@ export default function LandingHeader() {
                                     Enter U.
                                 </Link>
                                 <div className="h-px bg-slate-100 my-1 mx-2"></div>
-                                <Link
-                                    href="/admin/login"
-                                    className="text-sm font-medium text-slate-500 hover:text-slate-900 hover:bg-slate-50 px-4 py-3 rounded-xl transition-colors"
-                                    onClick={() => setIsMobileMenuOpen(false)}
-                                >
-                                    Enter for Admin
-                                </Link>
+
                             </>
                         )}
                     </div>
