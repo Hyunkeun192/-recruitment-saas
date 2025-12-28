@@ -241,7 +241,18 @@ export default function ReportContent({
                 <InterpretationGuide />
                 <ReliabilityAnalysis
                     questions={Object.values(questionsMap)}
-                    answers={answers}
+                    answers={(() => {
+                        // Map Index-Keyed Answers (from DB) to ID-Keyed Answers (for component)
+                        const idKeyedAnswers: Record<string, number> = {};
+                        qOrder.forEach((qId, idx) => {
+                            // answers keys are string indices "0", "1"...
+                            const val = answers[idx] ?? (answers as any)[idx.toString()];
+                            if (val !== undefined) {
+                                idKeyedAnswers[qId] = val;
+                            }
+                        });
+                        return idKeyedAnswers;
+                    })()}
                 />
                 <MindCareAnalysis detailedScores={result.detailed_scores} />
             </div>

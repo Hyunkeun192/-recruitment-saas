@@ -60,6 +60,9 @@ export default function PersonalityScoringManagement() {
     const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
     const [newVersionName, setNewVersionName] = useState('');
 
+    // Source Test Logic
+
+
     // View Details Modal
     const [viewVersion, setViewVersion] = useState<NormVersion | null>(null);
 
@@ -107,6 +110,7 @@ export default function PersonalityScoringManagement() {
             const { data, error } = await fetchTestsAction(); // Use server action to bypass RLS
 
             if (error) throw error;
+            setTests(data || []);
             setTests(data || []);
             if (data && data.length > 0 && !selectedTestId) {
                 setSelectedTestId((data as any)[0].id);
@@ -188,7 +192,8 @@ export default function PersonalityScoringManagement() {
 
         try {
             // Use Server Action to bypass RLS
-            const { data, error } = await fetchTestResultsForNorms(selectedTestId, startDate, endDate);
+            // Pass target test ID only (backend will handle source selection if needed)
+            const { data, count, meta, error } = await fetchTestResultsForNorms(selectedTestId, selectedTestId, startDate, endDate);
 
             if (error) throw new Error(error);
             if (!data || data.length === 0) {
@@ -197,14 +202,222 @@ export default function PersonalityScoringManagement() {
                 return;
             }
 
+            // Show Success Toast with Count
+            toast.success(`총 ${count}건의 유효 데이터를 로드했습니다.`);
+
             const valuesMap: Record<string, number[]> = {};
 
-            data.forEach((row: any) => {
-                const details = row.detailed_scores;
-                if (!details) return;
+            if (stage === 'COMPETENCY') {
+                // [Logic Update] Competency Norms must be based on Sum of Scale T-Scores.
+                // 1. Calculate Scale Stats first (Mean/StdDev) from the current sample.
+                const scaleValues: Record<string, number[]> = {};
+                data.forEach((row: any) => {
+                    const scales = row.detailed_scores?.scales || {};
+                    Object.entries(scales).forEach(([k, v]: [string, any]) => {
+                        let raw = typeof v === 'number' ? v : v.raw;
+                        if (raw !== undefined) {
+                            if (!scaleValues[k]) scaleValues[k] = [];
+                            scaleValues[k].push(raw);
+                        }
+                    });
+                });
 
-                if (stage === 'SCALE') {
-                    // details.scales: { 'Category': { raw: 10, t_score: 50 }, ... }
+                const scaleStats: Record<string, { mean: number, std: number }> = {};
+                Object.entries(scaleValues).forEach(([k, vals]) => {
+                    const n = vals.length;
+                    if (n === 0) return;
+                    const mean = vals.reduce((a, b) => a + b, 0) / n;
+                    const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n > 1 ? n - 1 : 1);
+                    const std = Math.sqrt(variance);
+                    scaleStats[k] = { mean, std };
+                });
+
+                // 2. Calculate User-Level Competency Scores (Sum of Scale T-Scores)
+                // Need metadata to know which scales belong to which competency
+                const compMeta = meta?.competencies || [];
+                const compDef: Record<string, string[]> = {};
+                compMeta.forEach((c: any) => {
+                    compDef[c.name] = c.competency_scales.map((cs: any) => cs.scale_name);
+                });
+
+                data.forEach((row: any) => {
+                    const scales = row.detailed_scores?.scales || {};
+
+                    Object.entries(compDef).forEach(([compName, scaleNames]) => {
+                        let tSum = 0;
+                        let valid = true;
+
+                        // If no scales defined, skip
+                        if (scaleNames.length === 0) valid = false;
+
+                        scaleNames.forEach(sName => {
+                            const rawObj = scales[sName];
+                            const raw = (typeof rawObj === 'number') ? rawObj : rawObj?.raw;
+                            const stat = scaleStats[sName];
+
+                            if (raw !== undefined && stat) {
+                                let t = 50; // Default
+                                if (stat.std > 0) {
+                                    t = 50 + 10 * (raw - stat.mean) / stat.std;
+                                } else {
+                                    // Variance is 0. All users have same score.
+                                    // T-score is undefined mathematically (div by 0).
+                                    // Handle gracefully: assume 50? Or exclude?
+                                    // If everyone is same, they are average. 50.
+                                    t = 50;
+                                }
+                                tSum += t;
+                            } else {
+                                // Missing scale score or stats -> cannot calc competency
+                                valid = false;
+                            }
+                        });
+
+                        if (valid) {
+                            if (!valuesMap[compName]) valuesMap[compName] = [];
+                            valuesMap[compName].push(tSum);
+                        }
+                    });
+                });
+
+            } else if (stage === 'TOTAL') {
+                // [Logic Update] Total Norms must be based on Sum of Competency T-Scores.
+
+                // 1. Calculate Scale Stats
+                const scaleValues: Record<string, number[]> = {};
+                data.forEach((row: any) => {
+                    const scales = row.detailed_scores?.scales || {};
+                    Object.entries(scales).forEach(([k, v]: [string, any]) => {
+                        let raw = typeof v === 'number' ? v : v.raw;
+                        if (raw !== undefined) {
+                            if (!scaleValues[k]) scaleValues[k] = [];
+                            scaleValues[k].push(raw);
+                        }
+                    });
+                });
+
+                const scaleStats: Record<string, { mean: number, std: number }> = {};
+                Object.entries(scaleValues).forEach(([k, vals]) => {
+                    const n = vals.length;
+                    if (n === 0) return;
+                    const mean = vals.reduce((a, b) => a + b, 0) / n;
+                    const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n > 1 ? n - 1 : 1);
+                    const std = Math.sqrt(variance);
+                    scaleStats[k] = { mean, std };
+                });
+
+                // 2. Calculate Competency Stats (to get Comp T-Scores)
+                const compMeta = meta?.competencies || [];
+                const compDef: Record<string, string[]> = {};
+                compMeta.forEach((c: any) => {
+                    compDef[c.name] = c.competency_scales.map((cs: any) => cs.scale_name);
+                });
+
+                const compValues: Record<string, number[]> = {};
+
+                data.forEach((row: any) => {
+                    const scales = row.detailed_scores?.scales || {};
+                    Object.entries(compDef).forEach(([compName, scaleNames]) => {
+                        let tSum = 0;
+                        let valid = true;
+                        if (scaleNames.length === 0) valid = false;
+
+                        scaleNames.forEach(sName => {
+                            const rawObj = scales[sName];
+                            const raw = (typeof rawObj === 'number') ? rawObj : rawObj?.raw;
+                            const stat = scaleStats[sName];
+                            if (raw !== undefined && stat) {
+                                let t = 50;
+                                if (stat.std > 0) t = 50 + 10 * (raw - stat.mean) / stat.std;
+                                tSum += t;
+                            } else {
+                                valid = false;
+                            }
+                        });
+
+                        if (valid) {
+                            if (!compValues[compName]) compValues[compName] = [];
+                            compValues[compName].push(tSum);
+                        }
+                    });
+                });
+
+                const compStats: Record<string, { mean: number, std: number }> = {};
+                Object.entries(compValues).forEach(([k, vals]) => {
+                    const n = vals.length;
+                    if (n === 0) return;
+                    const mean = vals.reduce((a, b) => a + b, 0) / n;
+                    const variance = vals.reduce((a, b) => a + Math.pow(b - mean, 2), 0) / (n > 1 ? n - 1 : 1);
+                    const std = Math.sqrt(variance);
+                    compStats[k] = { mean, std };
+                });
+
+                // 3. Calculate Final Total Raw (Sum of Competency T-Scores)
+                data.forEach((row: any) => {
+                    const scales = row.detailed_scores?.scales || {};
+                    let totalCompTSum = 0;
+                    let validTotal = true;
+
+                    const compNames = Object.keys(compDef);
+                    if (compNames.length === 0) {
+                        // Fallback: Sum of Scale T-Scores if no competencies
+                        let scaleTSum = 0;
+                        Object.keys(scaleStats).forEach(sName => {
+                            const rawObj = scales[sName];
+                            const raw = (typeof rawObj === 'number') ? rawObj : rawObj?.raw;
+                            const stat = scaleStats[sName];
+                            if (raw !== undefined && stat) {
+                                let t = 50;
+                                if (stat.std > 0) t = 50 + 10 * (raw - stat.mean) / stat.std;
+                                scaleTSum += t;
+                            }
+                        });
+                        totalCompTSum = scaleTSum;
+                    } else {
+                        compNames.forEach(compName => {
+                            const scaleNames = compDef[compName];
+                            let compRaw = 0;
+                            let compValid = true;
+                            if (scaleNames.length === 0) compValid = false;
+
+                            scaleNames.forEach(sName => {
+                                const rawObj = scales[sName];
+                                const raw = (typeof rawObj === 'number') ? rawObj : rawObj?.raw;
+                                const stat = scaleStats[sName];
+                                if (raw !== undefined && stat) {
+                                    let t = 50;
+                                    if (stat.std > 0) t = 50 + 10 * (raw - stat.mean) / stat.std;
+                                    compRaw += t;
+                                } else {
+                                    compValid = false;
+                                }
+                            });
+
+                            if (compValid) {
+                                const cStat = compStats[compName];
+                                let cT = 50;
+                                if (cStat && cStat.std > 0) {
+                                    cT = 50 + 10 * (compRaw - cStat.mean) / cStat.std;
+                                }
+                                totalCompTSum += cT;
+                            } else {
+                                validTotal = false;
+                            }
+                        });
+                    }
+
+                    if (validTotal) {
+                        if (!valuesMap['TOTAL']) valuesMap['TOTAL'] = [];
+                        valuesMap['TOTAL'].push(totalCompTSum);
+                    }
+                });
+
+            } else {
+                // Fallback for SCALE (Raw Scores)
+                data.forEach((row: any) => {
+                    const details = row.detailed_scores;
+                    if (!details) return;
+
                     const scales = details.scales || {};
                     Object.entries(scales).forEach(([key, val]: [string, any]) => {
                         let raw = typeof val === 'number' ? val : val.raw;
@@ -213,24 +426,8 @@ export default function PersonalityScoringManagement() {
                             valuesMap[key].push(raw);
                         }
                     });
-                } else if (stage === 'COMPETENCY') {
-                    const comps = details.competencies || {};
-                    Object.entries(comps).forEach(([key, val]: [string, any]) => {
-                        let raw = typeof val === 'number' ? val : val.raw;
-                        if (raw !== undefined) {
-                            if (!valuesMap[key]) valuesMap[key] = [];
-                            valuesMap[key].push(raw);
-                        }
-                    });
-                } else if (stage === 'TOTAL') {
-                    // [UPDATED] Use detailed_scores.raw_total (Sum of Competency T-Scores)
-                    const raw = details.raw_total;
-                    if (typeof raw === 'number') {
-                        if (!valuesMap['TOTAL']) valuesMap['TOTAL'] = [];
-                        valuesMap['TOTAL'].push(raw);
-                    }
-                }
-            });
+                });
+            }
 
             const stats: CalculatedStat[] = Object.entries(valuesMap).map(([key, values]) => {
                 const n = values.length;
@@ -266,12 +463,24 @@ export default function PersonalityScoringManagement() {
         if (!previewStats || !selectedTestId) return;
 
         try {
-            const newNorms = previewStats.data.map(stat => ({
-                test_id: selectedTestId,
-                category_name: stat.category_name,
-                mean_value: parseFloat(stat.mean_value.toFixed(5)),
-                std_dev_value: parseFloat(stat.std_dev_value.toFixed(5))
-            }));
+            const newNorms = previewStats.data.map(stat => {
+                let prefix = '';
+                if (stat.type === 'CATEGORY') prefix = 'Scale_';
+                else if (stat.type === 'COMPETENCY') prefix = 'Comp_';
+                else if (stat.type === 'TOTAL') prefix = 'Comp_'; // Total treated as Comp norm
+
+                // Ensure we don't double prefix if it already exists (unlikely but safe)
+                const safeName = stat.category_name.startsWith(prefix)
+                    ? stat.category_name
+                    : `${prefix}${stat.category_name}`;
+
+                return {
+                    test_id: selectedTestId,
+                    category_name: safeName,
+                    mean_value: parseFloat(stat.mean_value.toFixed(5)),
+                    std_dev_value: parseFloat(stat.std_dev_value.toFixed(5))
+                };
+            });
 
             const { error } = await supabase
                 .from('test_norms')
@@ -343,18 +552,43 @@ export default function PersonalityScoringManagement() {
             // Set target to true
             await (supabase.from('test_norm_versions') as any).update({ is_active: true }).eq('id', version.id);
 
-            // 2. Restore Snapshot to test_norms (The actual logic to "Activate" the norms)
-            // Note: We should first clear existing norms if needed, but upsert is fine since we calculate "All Keys" in fetchTestDetails anyway.
-            // Better to delete all for this test_id first to avoid stale keys? 
-            // Ideally yes, but let's stick to Upsert as it's safer for referential integrity if any.
-            // Actually, deleting norms might be risky if we have foreign keys elsewhere? No.
-            // Let's use Upsert.
+            // 2. Restore Snapshot to test_norms
+
+            // [Safeguard] Fetch Competencies to ensure correct prefixes for Legacy Snapshots
+            // [Safeguard] Fetch Competencies to ensure correct prefixes for Legacy Snapshots
+            const { data: currentComps } = await supabase
+                .from('competencies')
+                .select('name')
+                .eq('test_id', selectedTestId);
+
+            const compNames = new Set((currentComps as any[])?.map(c => c.name) || []);
+
+            const normsToRestore = version.active_norms_snapshot.map(n => {
+                let name = n.category_name;
+                // If already correctly prefixed, preserve it
+                if (name.startsWith('Scale_') || name.startsWith('Comp_')) {
+                    return { ...n, test_id: selectedTestId };
+                }
+
+                // If Legacy (no prefix), infer prefix
+                let newName = '';
+                if (name === 'TOTAL' || name === 'ALL' || name.toUpperCase() === 'TOTAL') {
+                    newName = 'Comp_TOTAL';
+                } else if (compNames.has(name)) {
+                    newName = `Comp_${name}`;
+                } else {
+                    newName = `Scale_${name}`;
+                }
+
+                return {
+                    ...n,
+                    category_name: newName,
+                    test_id: selectedTestId
+                };
+            });
 
             const { error } = await supabase.from('test_norms').upsert(
-                version.active_norms_snapshot.map(n => ({
-                    ...n,
-                    test_id: selectedTestId
-                })) as any,
+                normsToRestore as any,
                 { onConflict: 'test_id, category_name' }
             );
 
@@ -579,6 +813,8 @@ export default function PersonalityScoringManagement() {
                                         </button>
                                     </div>
                                 </div>
+
+
 
                                 <div className="space-y-4">
                                     {renderStage('SCALE', 1, '척도(Scale) 규준', false)}

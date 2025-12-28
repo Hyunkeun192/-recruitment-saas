@@ -12,6 +12,7 @@
     * **Tenant Onboarding:** 기업 계정 생성 및 Master 계정 발급.
     * **God Mode:** 특정 기업 담당자로 로그인하여 문제 해결 (Impersonation).
     * **Global Asset:** 전사 공통 문제은행(인성/적성 Global Question Bank) 관리 및 규준(Norms) 버전 관리.
+    * **Question Dashboard:** 문항 유형별(인성/적성) 통계 및 카테고리별 분포를 한눈에 확인하는 대시보드 제공.
     * **Security:** 보안 관제 및 서비스 강제 종료(Kill Switch).
 
 ### B. Corporate Admin (Client HR)
@@ -56,9 +57,10 @@
 7.  **test_results:** 온라인 시험 결과, 부정행위 로그, 웹캠 URL.
 8.  **interview_slots:** 면접 일정 스케줄링.
 9.  **evaluations:** 평가 점수(Draft/Submitted), 코멘트, 회피 여부.
-10. **audit_logs:** 개인정보 접근 및 다운로드 이력 기록.
 11. **admin_contents:** U-Class 콘텐츠(아티클, 비디오) 데이터.
 12. **admin_content_comments:** U-Class 아티클의 댓글/답변 데이터(계층형 구조).
+13. **posts:** 커뮤니티 게시글 (자유, Q&A, 후기 등).
+14. **comments:** 커뮤니티 게시글에 대한 댓글.
 
 ## 4. Key Functional Requirements (개발 가이드)
 
@@ -83,17 +85,28 @@
 3.  **Visual Elements:**
     * 합격/불합격 상태는 **배지(Badge)** 형태로 시각화.
     * 자소서 내 핵심 키워드(예: React)는 **하이라이트(형광펜)** 처리.
+4.  **Mobile Experience:**
+    * **Responsive Header:** 모바일 환경에 최적화된 햄버거 메뉴(Hamburger Menu) 네비게이션 제공.
+    * **Optimized Test Layout:** 모바일 응시 시 타이머 및 진행 상태바 위치 최적화로 가독성 확보.
 
-### B. Online Test Stability (Fail-Safe)
+### C. Online Test Stability (Fail-Safe)
 1.  **Timer:** 클라이언트 시간이 아닌 **서버 시간**을 기준으로 잔여 시간을 계산.
 2.  **Heartbeat:** 30초마다 서버에 생존 신호 전송, 실패 시 네트워크 불안정 경고.
 3.  **Auto-Recovery:** 브라우저 재접속 시 마지막 저장 답안과 남은 시간을 복구.
 4.  **Conditional Access:** 적성검사(Webcam 필수)는 **모바일 접속 차단** (PC Only).
 
-### C. Security & Data Protection
+### D. Security & Data Protection
 1.  **Audit Logging:** `users` 또는 `applications` 테이블의 대량 조회/다운로드 시 반드시 `audit_logs`에 기록.
 2.  **Blind Mode:** 공고 설정(`blind_mode = true`) 시, 평가자 화면에서 이름/사진/학교 정보를 마스킹(`***`) 처리.
 3.  **Token Access:** 외부 평가자는 이메일 링크 내의 Token을 검증하여 로그인 절차 없이 접속.
+
+### E. Community Board [NEW]
+1.  **Communication:**
+    * **Categories:** 자유게시판, Q&A, 채용 후기 등 다양한 카테고리 지원.
+    * **Comments:** 게시글에 대한 댓글 작성 및 소통 기능.
+2.  **User Experience:**
+    * **Rich Text:** 텍스트 및 이미지 업로드를 포함한 게시글 작성.
+    * **Interaction:** 조회수 집계 및 베스트 게시글 노출(추후 예정).
 
 ## 5. Technology Stack & Constraints (기술 스택 - 필수 준수)
 

@@ -5,6 +5,7 @@ import { useState, useEffect, use, useRef, useCallback } from "react";
 import { ArrowLeft, ArrowRight, Check, Clock, AlertTriangle } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { toast } from "sonner";
+import { calculatePersonalityScores } from "@/lib/scoring";
 import { useRouter } from "next/navigation";
 import {
     Dialog,
@@ -545,106 +546,85 @@ export default function PersonalityTestPage({ params }: { params: Promise<{ id: 
                 console.error("[Submit] Error fetching competencies:", compError);
             }
 
-            // 3. Calculate Raw Scores per Category (Scale)
-            const categoryRawScores: Record<string, number> = {};
-            let totalRawScore = 0;
+            // 3. Prepare Data for Shared Scoring Logic
+            const scaleNorms = (norms as any)
+                ?.filter((n: any) => n.category_name.startsWith('Scale_'))
+                .map((n: any) => ({
+                    category_name: n.category_name.replace('Scale_', ''),
+                    mean_value: Number(n.mean_value),
+                    std_dev_value: Number(n.std_dev_value)
+                })) || [];
 
+            const competencyNorms = (norms as any)
+                ?.filter((n: any) => n.category_name.startsWith('Comp_'))
+                .map((n: any) => ({
+                    category_name: n.category_name.replace('Comp_', ''),
+                    mean_value: Number(n.mean_value),
+                    std_dev_value: Number(n.std_dev_value)
+                })) || [];
+
+            // If no prefixed norms found, try to use raw names (legacy support)
+            // But usually the new system uses prefixes.
+            if (scaleNorms.length === 0 && competencyNorms.length === 0) {
+                (norms as any)?.forEach((n: any) => {
+                    // Heuristic: if it looks like a competency name, put in comp?
+                    // Safer to just put everything in Scale if unsure, or duplicate?
+                    // For now, let's assume Prefixes are present if using new logic.
+                    // If not, maybe just map everything to ScaleNorms for safety?
+                    scaleNorms.push({
+                        category_name: n.category_name,
+                        mean_value: Number(n.mean_value),
+                        std_dev_value: Number(n.std_dev_value)
+                    });
+                });
+            }
+
+            const questionList = questions.map(q => ({
+                id: q.id,
+                category: q.category || '기타'
+            }));
+
+            const compList = (competencyDefs || []).map((c: any) => ({
+                name: c.name,
+                competency_scales: c.competency_scales
+            }));
+
+            // Prepare answers map (QID -> Value)
+            // answers is { [index]: score }. Need to map index -> Question ID
+            const answersMap: Record<string, number> = {};
             questions.forEach((q, idx) => {
-                const answer = answers[idx];
-                if (answer !== undefined) {
-                    const category = q.category || '기타';
-                    const score = q.is_reverse_scored ? (6 - answer) : answer;
+                const ans = answers[idx];
+                if (ans !== undefined) {
+                    // Check reverse scoring
+                    // The shared lib EXPECTS raw answer value? Or scored value?
+                    // lib/scoring.ts: "const score = typeof val === 'number' ? val : parseFloat(val);"
+                    // It sums these up.
+                    // So we must handle Reverse Scoring HERE if lib doesn't know about it.
+                    // lib definition: "questions: ScoringQuestion[]". ScoringQuestion { id, category }.
+                    // It does NOT have 'is_reverse_scored'.
+                    // So we must pass the FINAL SCORE (1-5) to the lib.
 
-                    categoryRawScores[category] = (categoryRawScores[category] || 0) + score;
-                    totalRawScore += score;
+                    const score = q.is_reverse_scored ? (6 - ans) : ans;
+                    answersMap[q.id] = score;
                 }
             });
 
-            console.log("[Submit] Raw scores calculated:", categoryRawScores);
+            // 4. Calculate Scores
+            const calculated = calculatePersonalityScores(
+                answersMap,
+                questionList,
+                scaleNorms,
+                competencyNorms,
+                compList
+            );
 
-            // 4. Calculate T-Scores per Scale
-            const scaleResults: Record<string, { raw: number, t_score: number }> = {};
-            Object.entries(categoryRawScores).forEach(([cat, raw]) => {
-                let tScore = 50;
-                if (normMap[cat] && normMap[cat].stdDev > 0) {
-                    const zScore = (raw - normMap[cat].mean) / normMap[cat].stdDev;
-                    tScore = Math.round((zScore * 10 + 50) * 100) / 100;
-                }
-                if (isNaN(tScore)) tScore = 50;
-                scaleResults[cat] = { raw, t_score: tScore };
-            });
+            console.log("[Submit] Calculated:", calculated);
 
-            // 5. Aggregate Scale T-Scores into Competency T-Scores
-            // (Average of T-scores of member scales)
-            const competencyResults: Record<string, { t_score: number }> = {};
-
-            if (competencyDefs && competencyDefs.length > 0) {
-                competencyDefs.forEach((comp: any) => {
-                    const scales = comp.competency_scales.map((cs: any) => cs.scale_name);
-                    const memberTScores = scales
-                        .map((s: string) => scaleResults[s]?.t_score)
-                        .filter((s: number | undefined) => s !== undefined);
-
-                    let avgTScore = 50;
-                    if (memberTScores.length > 0) {
-                        avgTScore = memberTScores.reduce((a: number, b: number) => a + b, 0) / memberTScores.length;
-                    }
-                    competencyResults[comp.name] = { t_score: Math.round(avgTScore * 100000) / 100000 };
-                });
-            } else {
-                // Fallback: If no competencies defined, use scale scores as competencies (Legacy behavior)
-                Object.entries(scaleResults).forEach(([cat, res]) => {
-                    competencyResults[cat] = { t_score: res.t_score };
-                });
-            }
-
-            // 6. Calculate Final Total T-Score
-            // [REFACTORED] Total Raw Score is now the SUM of Competency T-Scores (or Scale T-Scores if no competencies)
-            // This ensures weighting is balanced by competency structure.
-            let newTotalRawScore = 0;
-            const competencyNames = Object.keys(competencyResults);
-
-            if (competencyNames.length > 0) {
-                // Sum of Competency T-Scores
-                newTotalRawScore = competencyNames.reduce((sum, key) => sum + competencyResults[key].t_score, 0);
-            } else {
-                // Fallback: Sum of Scale T-Scores
-                newTotalRawScore = Object.values(scaleResults).reduce((sum, s) => sum + s.t_score, 0);
-            }
-
-            console.log(`[Submit] New Total Raw Score (Sum of T-Scores): ${newTotalRawScore}`);
-
-            let finalTScore = 50;
-            const totalNorm = normMap['TOTAL'] || normMap['ALL'] || normMap['total'] || null;
-
-            if (totalNorm && totalNorm.stdDev > 0) {
-                // Use the NEW totalRawScore against the TOTAL norm
-                const zScore = (newTotalRawScore - totalNorm.mean) / totalNorm.stdDev;
-                finalTScore = Math.round((zScore * 10 + 50) * 100000) / 100000;
-            } else {
-                // Heuristic Fallback if TOTAL norm is missing (Should not happen if migration is run)
-                // Just use average of components as a safe fallback?
-                // Or keep it 50.
-                if (competencyNames.length > 0) {
-                    finalTScore = newTotalRawScore / competencyNames.length;
-                } else {
-                    finalTScore = newTotalRawScore / Object.keys(scaleResults).length;
-                }
-                finalTScore = Math.round(finalTScore * 100000) / 100000;
-            }
-
-            // Override the old item-based totalRawScore for DB saving
-            totalRawScore = newTotalRawScore;
-
-            if (isNaN(finalTScore)) finalTScore = 50;
+            const finalTScore = calculated.total.t_score;
+            const totalRawScore = calculated.raw_total; // This is sum of T-scores per logic
 
             // 7. Build detailed_scores structure
-            const detailed_scores = {
-                competencies: competencyResults,
-                scales: scaleResults,
-                total: { t_score: finalTScore },
-                raw_total: totalRawScore
-            };
+            const detailed_scores = calculated;
 
             console.log("[Submit] Final scores to save:", detailed_scores);
 
